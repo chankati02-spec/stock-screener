@@ -508,8 +508,8 @@
     "in_earnings_season": true
   },
   "APPN": {
-    "last_updated": "2026-02-09T13:31:00.336959",
-    "in_earnings_season": true
+    "last_updated": "2026-05-29T16:04:30.240189",
+    "in_earnings_season": false
   },
   "AQST": {
     "last_updated": "2025-12-04T13:36:53.101897",
@@ -6624,7 +6624,7 @@
     "in_earnings_season": true
   },
   "VEEV": {
-    "last_updated": "2025-12-04T14:17:49.894756",
+    "last_updated": "2026-05-29T16:59:17.653510",
     "in_earnings_season": false
   },
   "VERA": {
@@ -9489,6 +9489,10 @@
   },
   "FMAO": {
     "last_updated": "2026-05-28T16:40:14.417340",
+    "in_earnings_season": false
+  },
+  "VWAV": {
+    "last_updated": "2026-05-29T17:00:37.543845",
     "in_earnings_season": false
   }
 }
