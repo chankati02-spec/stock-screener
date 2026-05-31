@@ -103,7 +103,7 @@ crontab -e
 
 Add this line:
 ```cron
-30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh
 ```
 
 See `SETUP_CRON_JOB.md` for detailed instructions.

@@ -34,9 +34,9 @@ GitHub secrets keep your sensitive information (like email passwords) secure and
 
    | Secret Name | Value | Example |
    |------------|-------|---------|
-   | `EMAIL_FROM` | Your Gmail address | `ryanhamby22@gmail.com` |
-   | `EMAIL_PASSWORD` | Your Gmail App Password | `bufv obel oqqs ujur` |
-   | `EMAIL_TO` | Recipient email address | `ryanhamby22@gmail.com` |
+   | `EMAIL_FROM` | Your Gmail address | `you@gmail.com` |
+   | `EMAIL_PASSWORD` | Your Gmail App Password | `xxxx xxxx xxxx xxxx` |
+   | `EMAIL_TO` | Recipient email address | `you@gmail.com` |
 
    **Optional secrets** (if you want to customize):
 
@@ -107,7 +107,7 @@ schedule:
 
 - Double-check your `EMAIL_FROM` and `EMAIL_PASSWORD` secrets
 - Make sure you're using a Gmail App Password, not your regular password
-- Verify the App Password doesn't have spaces in GitHub (should be: `bufvobeloqqsujur`)
+- Verify the App Password doesn't have spaces in GitHub (e.g. `xxxxxxxxxxxxxxxxxxxx` — no spaces)
 
 ### No email received
 

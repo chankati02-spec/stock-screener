@@ -211,10 +211,8 @@ By using this software, you acknowledge that **you alone are responsible** for a
 ## Connect
 
 **Built by**: Ryan Hamby
-**Email**: ryanhamby22@gmail.com
+**GitHub**: [github.com/RyanJHamby](https://github.com/RyanJHamby)
 **LinkedIn**: [linkedin.com/in/ryanhamby](https://linkedin.com/in/ryanhamby)
-
-**For Robinhood recruiters**: I'm happy to discuss the technical architecture, design decisions, and potential applications to institutional trading systems. This project demonstrates real-world skills in data engineering, system design, and financial analysis automation.
 
 ---
 
@@ -224,7 +222,7 @@ Curious to try it? Get started in 5 minutes:
 
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/stock-screener.git
+git clone https://github.com/RyanJHamby/stock-screener.git
 cd stock-screener
 python -m venv venv
 source venv/bin/activate

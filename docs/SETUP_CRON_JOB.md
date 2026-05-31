@@ -16,10 +16,10 @@ Add this line at the end of the file:
 
 ```cron
 # Daily market scan at 6:30 AM EST (Mon-Fri)
-30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh
 ```
 
-**Important**: Replace `/Users/ryanhamby/Documents/stock-screener` with your actual project path!
+**Important**: Replace `/path/to/stock-screener` with your actual project path!
 
 ### 3. Save and Exit
 
@@ -107,7 +107,7 @@ date
 crontab -e
 
 # Add a test line (if it's 9:15 AM now, set for 9:17 AM)
-17 9 * * * /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+17 9 * * * /path/to/stock-screener/daily_scanner.sh
 ```
 
 Wait 2 minutes, then check if it ran:
@@ -203,7 +203,7 @@ Common causes:
 Change your crontab line to:
 
 ```cron
-30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh >> /tmp/cron_output.log 2>&1
+30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh >> /tmp/cron_output.log 2>&1
 ```
 
 Then check `/tmp/cron_output.log` for errors.
@@ -237,7 +237,7 @@ crontab -r
 Comment out the line in crontab:
 
 ```cron
-# 30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+# 30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh
 ```
 
 ---
@@ -353,7 +353,7 @@ grep CRON /var/log/syslog
 crontab -e
 
 # 2. Add this line (update path!)
-30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh
 
 # 3. Save and exit
 

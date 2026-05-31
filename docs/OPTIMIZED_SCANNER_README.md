@@ -283,7 +283,7 @@ Change to:
 
 ```cron
 # Daily optimized scan at 6:30 AM EST
-30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_optimized_scanner.sh
+30 6 * * 1-5 /path/to/stock-screener/daily_optimized_scanner.sh
 ```
 
 ### Create Optimized Daily Script

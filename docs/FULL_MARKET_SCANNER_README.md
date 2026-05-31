@@ -98,7 +98,7 @@ python run_full_market_scan.py --clear-progress
 2. **Add this line** (replace path with your actual path):
    ```cron
    # Daily market scan at 6:30 AM EST
-   30 6 * * 1-5 /Users/ryanhamby/Documents/stock-screener/daily_scanner.sh
+   30 6 * * 1-5 /path/to/stock-screener/daily_scanner.sh
    ```
 
    This runs Monday-Friday at 6:30 AM EST.

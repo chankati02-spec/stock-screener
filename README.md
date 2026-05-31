@@ -447,7 +447,7 @@ python manage_positions.py --export
 
 ```
 Logging in to Robinhood...
-Robinhood password for ryanhamby22@gmail.com: ********
+Robinhood password for you@example.com: ********
 
 MFA required - check your phone for SMS code from Robinhood
 Enter SMS code from Robinhood: 123456
