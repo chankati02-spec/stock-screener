@@ -2032,7 +2032,7 @@
     "in_earnings_season": false
   },
   "DSP": {
-    "last_updated": "2025-12-04T13:46:42.023718",
+    "last_updated": "2026-06-09T15:38:40.771622",
     "in_earnings_season": false
   },
   "DTE": {
@@ -2796,7 +2796,7 @@
     "in_earnings_season": true
   },
   "GIC": {
-    "last_updated": "2026-03-06T13:38:26.717584",
+    "last_updated": "2026-06-09T15:45:19.864656",
     "in_earnings_season": false
   },
   "GIFI": {
@@ -3412,8 +3412,8 @@
     "in_earnings_season": true
   },
   "INSE": {
-    "last_updated": "2026-01-15T13:31:27.762173",
-    "in_earnings_season": true
+    "last_updated": "2026-06-09T15:50:26.884853",
+    "in_earnings_season": false
   },
   "INSG": {
     "last_updated": "2025-12-04T13:55:33.401095",
@@ -6172,7 +6172,7 @@
     "in_earnings_season": true
   },
   "TGEN": {
-    "last_updated": "2025-12-04T14:14:50.957855",
+    "last_updated": "2026-06-09T16:16:24.078663",
     "in_earnings_season": false
   },
   "TGNA": {
@@ -7360,8 +7360,8 @@
     "in_earnings_season": true
   },
   "EPAC": {
-    "last_updated": "2026-02-13T13:38:31.662613",
-    "in_earnings_season": true
+    "last_updated": "2026-06-09T15:40:43.989640",
+    "in_earnings_season": false
   },
   "ESAB": {
     "last_updated": "2026-05-07T14:56:43.753056",
@@ -7744,12 +7744,12 @@
     "in_earnings_season": true
   },
   "PPIH": {
-    "last_updated": "2026-01-30T13:59:07.060715",
-    "in_earnings_season": true
+    "last_updated": "2026-06-09T16:06:21.533601",
+    "in_earnings_season": false
   },
   "SMPL": {
-    "last_updated": "2026-01-23T13:56:14.749770",
-    "in_earnings_season": true
+    "last_updated": "2026-06-09T16:13:15.105970",
+    "in_earnings_season": false
   },
   "WFG": {
     "last_updated": "2026-04-27T15:18:47.460294",
@@ -9529,6 +9529,18 @@
   },
   "BELFA": {
     "last_updated": "2026-06-08T16:17:15.056039",
+    "in_earnings_season": false
+  },
+  "FCCO": {
+    "last_updated": "2026-06-09T15:42:09.917048",
+    "in_earnings_season": false
+  },
+  "MH": {
+    "last_updated": "2026-06-09T15:57:18.888068",
+    "in_earnings_season": false
+  },
+  "PUSA": {
+    "last_updated": "2026-06-09T16:07:20.025943",
     "in_earnings_season": false
   }
 }
