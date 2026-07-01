@@ -2,10 +2,10 @@ name: Daily Stock Screening (Git-Based Storage)
 
 on:
   schedule:
-    # Run at 7am EST (12:00 UTC) on weekdays
-    - cron: '0 12 * * 1-5'
-
-  # Allow manual triggering
+    # 更改為 UTC 21:05執行，即香港時間凌晨 05:05 AM
+    # 正好是美股冬令時間收市後 5 分鐘，夏令時間收市後 1 小時 5 分鐘
+    - cron: '5 21 * * 1-5'
+  # 容許在 GitHub 網頁上手動按「Run workflow」觸發測試
   workflow_dispatch:
     inputs:
       force_full_refresh:
@@ -19,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # Required to commit fundamental cache
+      contents: write  # 容許 GitHub Action 把更新後的緩存存回倉庫
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # Shallow clone for speed
+          fetch-depth: 1  # 快速下載，節省雲端時間
 
       - name: Get current date
         id: date
@@ -42,12 +42,12 @@ jobs:
             echo "cached_stocks=$CACHE_COUNT" >> $GITHUB_OUTPUT
             echo "  Cached stocks: $CACHE_COUNT"
 
-            # Show cache age distribution
+            # 顯示緩存的分佈情況
             echo "  Cache age distribution:"
             find data/fundamentals_cache -name "*_fundamentals.json" -mtime -7 -type f | wc -l | xargs echo "    <7 days:"
             find data/fundamentals_cache -name "*_fundamentals.json" -mtime +7 -mtime -30 -type f | wc -l | xargs echo "    7-30 days:"
             find data/fundamentals_cache -name "*_fundamentals.json" -mtime +30 -mtime -90 -type f | wc -l | xargs echo "    30-90 days:"
-            find data/fundamentals_cache -name "*_fundamentals.json" -mtime +90 -type f | wc -l | xargs echo "    >90 days (stale):"
+            find data/fundamentals_cache -name "*_fundamentals.json" -mtime +90 -type f | wc -l xargs echo "    >90 days (stale):"
           else
             echo "⚠ No existing cache, will create"
             mkdir -p data/fundamentals_cache
@@ -64,6 +64,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install requests pandas pyyaml  # 確保有我們新增的套件
 
       - name: Run optimized stock screening
         env:
@@ -81,13 +82,70 @@ jobs:
           echo "  - Cached fundamentals: $CACHED_STOCKS stocks"
           echo ""
 
-          # Create output directories
+          # 建立必要的資料夾
           mkdir -p data/daily_scans
           mkdir -p data/logs
 
-          # Conservative mode to avoid rate limits
-          # --git-storage flag enables Git-based fundamental storage
+          # 執行原作者的優化選股引擎
           python run_optimized_scan.py --conservative --git-storage
+
+      - name: Send Results to Telegram
+        if: success()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import os
+          import glob
+          import pandas as pd
+          import requests
+
+          token = os.getenv("TELEGRAM_TOKEN")
+          chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+          if not token or not chat_id:
+              print("⚠ 找不到 TELEGRAM_TOKEN 或 TELEGRAM_CHAT_ID。請先到 GitHub Settings 內設定。")
+              exit(0)
+
+          # 1. 尋找原引擎跑完產生的最新 CSV 結果
+          csv_files = glob.glob("data/daily_scans/*.csv")
+          if not csv_files:
+              print("⚠ 找不到任何今日選股的 CSV 檔案。")
+              exit(0)
+          
+          latest_file = max(csv_files, key=os.path.getmtime)
+          print(f"正在讀取最新報告: {latest_file}")
+
+          try:
+              df = pd.read_csv(latest_file)
+              if df.empty:
+                  requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": chat_id, "text": "今日美股：沒有符合 Qullamaggie 條件的股票。"})
+                  exit(0)
+
+              # 2. 格式化訊息 (只取前 15 隻最強、整理最窄幅的精選股票)
+              top_picks = df.head(15)
+              msg = "🚀 【Qullamaggie 強勢股監測】 🚀\n\n"
+              
+              for idx, row in top_picks.iterrows():
+                  ticker = row.get('ticker') or row.get('Ticker') or 'UNKNOWN'
+                  buy_signal = row.get('buy_signal', 0)
+                  value_score = row.get('value_score', 0)  # 這裏已經是我們重寫的動能分
+                  support_score = row.get('support_score', 0)  # 這裏是高位窄幅整理分
+                  price = row.get('current_price', 0)
+
+                  msg += f"#{idx+1} 股票: {ticker} (${price})\n"
+                  msg += f"   📈 總評分: {buy_signal:.1f} | 動能: {value_score:.1f}\n"
+                  msg += f"   🔍 窄幅整理度: {support_score:.1f}\n\n"
+
+              # 3. 推送到你的 Telegram 手機 APP
+              url = f"https://api.telegram.org/bot{token}/sendMessage"
+              requests.post(url, data={"chat_id": chat_id, "text": msg})
+              print("✓ Telegram 訊號推送成功！")
+
+          except Exception as e:
+              print(f"發送 Telegram 出現錯誤: {e}")
+          PYTHON_SCRIPT
 
       - name: Show fundamental refresh stats
         if: always()
@@ -96,26 +154,25 @@ jobs:
           if [ -f "data/fundamentals_cache/metadata.json" ]; then
             echo "Latest updates:"
             python3 << 'PYTHON_SCRIPT'
-          import json
-          from datetime import datetime
+            import json
+            from datetime import datetime
 
-          try:
-              with open("data/fundamentals_cache/metadata.json", "r") as f:
-                  metadata = json.load(f)
+            try:
+                with open("data/fundamentals_cache/metadata.json", "r") as f:
+                    metadata = json.load(f)
 
-              # Show last 10 updated stocks
-              updates = [(ticker, data["last_updated"]) for ticker, data in metadata.items()]
-              updates.sort(key=lambda x: x[1], reverse=True)
+                updates = [(ticker, data["last_updated"]) for ticker, data in metadata.items()]
+                updates.sort(key=lambda x: x[1], reverse=True)
 
-              print(f"Total tracked: {len(updates)} stocks")
-              print("\nLast 10 updates:")
-              for ticker, timestamp in updates[:10]:
-                  dt = datetime.fromisoformat(timestamp)
-                  formatted = dt.strftime("%Y-%m-%d %H:%M")
-                  print(f"  {ticker}: {formatted}")
-          except Exception as e:
-              print(f"Could not read metadata: {e}")
-          PYTHON_SCRIPT
+                print(f"Total tracked: {len(updates)} stocks")
+                print("\nLast 10 updates:")
+                for ticker, timestamp in updates[:10]:
+                    dt = datetime.fromisoformat(timestamp)
+                    formatted = dt.strftime("%Y-%m-%d %H:%M")
+                    print(f"  {ticker}: {formatted}")
+            except Exception as e:
+                print(f"Could not read metadata: {e}")
+            PYTHON_SCRIPT
           else
             echo "No metadata file found"
           fi
@@ -126,10 +183,8 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          # Add fundamental cache directory
           git add data/fundamentals_cache/
 
-          # Check if there are changes
           if git diff --staged --quiet; then
             echo "No fundamental cache changes to commit"
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -155,8 +210,8 @@ jobs:
           path: |
             data/daily_scans/
             data/logs/
-          if-no-files-found: warn  # Don't fail if no files found
-          retention-days: 90  # Keep screening results for 90 days
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Cache size report
         if: always()
