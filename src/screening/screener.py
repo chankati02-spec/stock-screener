@@ -15,6 +15,9 @@ This file keeps old repo-compatible column names:
 - nearest_support
 
 This file also keeps old repo-compatible functions:
+- calculate_value_score(fundamentals) -> float
+- detect_support_levels(price_df) -> List[float]
+- calculate_support_score(price_df, current_price=None) -> float
 - calculate_momentum_score(price_df) -> float
 - check_is_consolidating(price_df) -> float
 
@@ -348,6 +351,93 @@ def _rolling_sma(series: pd.Series, window: int) -> Optional[float]:
         return None
 
     return float(value)
+
+
+# =========================================================
+# Old Repo-Compatible Functions
+# =========================================================
+
+def calculate_value_score(fundamentals: Dict) -> float:
+    """
+    Old repo-compatible function.
+
+    Original repo may import this from src.screening.
+    In the Qullamaggie version, valuation is not the main ranking factor.
+
+    This function returns a simple neutral / defensive value score
+    so old imports/tests do not break.
+    """
+    if not fundamentals:
+        return 0.0
+
+    score = 0.0
+
+    pe_ratio = fundamentals.get("pe_ratio")
+    pb_ratio = fundamentals.get("pb_ratio")
+
+    try:
+        if pe_ratio is not None and pe_ratio > 0:
+            if pe_ratio < 15:
+                score += 40
+            elif pe_ratio < 25:
+                score += 25
+            elif pe_ratio < 40:
+                score += 10
+
+        if pb_ratio is not None and pb_ratio > 0:
+            if pb_ratio < 2:
+                score += 30
+            elif pb_ratio < 4:
+                score += 15
+
+    except Exception:
+        return 0.0
+
+    return min(score, 100.0)
+
+
+def detect_support_levels(price_df: pd.DataFrame) -> List[float]:
+    """
+    Old repo-compatible function.
+
+    Returns simple support levels based on:
+    - 10-day low
+    - 20-day low
+    - 50-day SMA if available
+    """
+    df = _clean_price_df(price_df)
+
+    if df.empty or len(df) < 10:
+        return []
+
+    support_levels = []
+
+    try:
+        low_10 = float(df["Low"].iloc[-10:].min())
+        support_levels.append(round(low_10, 2))
+
+        if len(df) >= 20:
+            low_20 = float(df["Low"].iloc[-20:].min())
+
+            if low_20 > 0 and abs(low_20 - low_10) / low_10 > 0.01:
+                support_levels.append(round(low_20, 2))
+
+        if len(df) >= 50:
+            sma_50 = _rolling_sma(df["Close"], 50)
+
+            if sma_50 is not None:
+                support_levels.append(round(sma_50, 2))
+
+    except Exception:
+        return []
+
+    # remove duplicate levels while keeping order
+    unique_levels = []
+    for level in support_levels:
+        if level not in unique_levels:
+            unique_levels.append(level)
+
+    return unique_levels
 
 
 # =========================================================
@@ -805,6 +895,20 @@ def check_is_consolidating(price_df: pd.DataFrame) -> float:
     Keeps old behavior:
     - accepts only price_df
     - returns only a float score
+    """
+    score, _ = calculate_consolidation_score(price_df)
+    return score
+
+
+def calculate_support_score(
+    price_df: pd.DataFrame,
+    current_price: Optional[float] = None
+) -> float:
+    """
+    Old repo-compatible function.
+
+    Uses the new consolidation score as support/setup score.
+    current_price is accepted for backward compatibility but not required.
     """
     score, _ = calculate_consolidation_score(price_df)
     return score
