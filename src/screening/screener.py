@@ -1,14 +1,20 @@
 """
 Stock screening module for Qullamaggie Momentum / Breakout Setup.
 
-Purpose:
-- Find strong momentum stocks
-- Avoid slow defensive stocks
-- Prefer high ADR names
-- Detect consolidation near highs
-- Estimate pivot, stop, and risk %
+Designed for:
+- Momentum breakout watchlist
+- High ADR stocks
+- Consolidation near highs
+- Practical Telegram output
+- Minimal repository changes
 
-This version is designed as a WATCHLIST generator, not an auto-buy system.
+This file keeps old repo-compatible column names:
+- value_score
+- support_score
+- buy_signal
+- nearest_support
+
+This is a WATCHLIST generator, not an auto-buy system.
 """
 
 import logging
@@ -21,55 +27,283 @@ import pandas as pd
 from src.data.storage import StockDatabase
 from .indicators import calculate_rsi
 
-# ---------------------------------------------------------
+
+# =========================================================
 # Logging
-# ---------------------------------------------------------
+# =========================================================
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Config
-# ---------------------------------------------------------
+# =========================================================
+# Universe Mode
+# =========================================================
+
+"""
+Choose one:
+
+"momentum" = only high ADR / high beta / Qullamaggie-style names
+"broad"    = large-cap / SPY / QQQ style names
+"combined" = momentum + broad
+
+If your repo already passes tickers from YAML, this file will still use those tickers.
+This internal universe is mainly a fallback / framework.
+"""
+
+DEFAULT_UNIVERSE_MODE = "combined"
+
+
+# =========================================================
+# Screening Config
+# =========================================================
 
 MIN_PRICE = 5.0
 MIN_DATA_DAYS = 220
 
-# Qullamaggie-style liquidity / volatility filters
-MIN_ADR_20 = 4.0                  # Average Daily Range % over 20 days
-MIN_AVG_DOLLAR_VOLUME = 20_000_000  # $20M average daily dollar volume
+MIN_ADR_20 = 4.0
+MIN_AVG_DOLLAR_VOLUME = 20_000_000
 
-# Momentum filters
 MAX_DISTANCE_FROM_52W_HIGH = 25.0
+
 MIN_1M_RETURN = 10.0
 MIN_3M_RETURN = 25.0
 
-# Risk filter
 MAX_SETUP_RISK_PCT = 12.0
 
-# Consolidation
-MIN_BASE_DAYS = 5
-MAX_BASE_DAYS = 25
+MIN_BUY_SIGNAL = 50.0
 
-# These tickers are known stale / problematic.
-# INFO is included because IHS Markit was acquired and is no longer a normal active public ticker.
+
+# =========================================================
+# Invalid / Stale Tickers
+# =========================================================
+
 INVALID_TICKERS = {
-    "INFO"
+    # Confirmed stale / acquired / delisted
+    "INFO",
+    "ATVI",
+    "ALXN",
+    "CELG",
+    "CTXS",
+    "MXIM",
+    "NUAN",
+
+    # Old / changed / problematic S&P tickers
+    "ABC",
+    "BLL",
+    "COG",
+    "DISCA",
+    "DISCK",
+    "DRE",
+    "FISV",
+    "KSU",
+    "MYL",
+    "NBL",
+    "PEAK",
+    "FB",
+
+    # Not normal single-stock tickers for this screener
+    "NDX",
+    "ARKG",
+
+    # Suspicious / likely unsupported by many data providers
+    "INFQ",
+    "SOLS",
+    "IMSR",
+    "SPCX",
+    "EIP",
+    "ILLM",
 }
 
 
-# ---------------------------------------------------------
-# Utility Helpers
-# ---------------------------------------------------------
+# =========================================================
+# Internal Universe Framework
+# =========================================================
+
+MOMENTUM_UNIVERSE = [
+    # AI / software / cyber
+    "CRWD", "NBIS", "SNOW", "PLTR", "DDOG", "ZS", "NET", "MDB",
+    "PANW", "FTNT", "NOW", "CRM", "TEAM", "WDAY", "APP",
+
+    # Semiconductors / AI hardware
+    "NVDA", "AMD", "AVGO", "MU", "ARM", "TSM", "ASML", "AMAT",
+    "LRCX", "KLAC", "QCOM", "SMCI", "MRVL", "ANET", "VRT",
+
+    # Crypto / fintech / speculative growth
+    "HOOD", "SOFI", "COIN", "MSTR", "MARA", "RIOT", "CLSK",
+    "WULF", "HUT", "BTDR", "GLXY", "AFRM", "UPST", "PYPL",
+
+    # Space / defense tech / drones
+    "RKLB", "LUNR", "JOBY", "RCAT", "IRDM", "ACHR", "ASTS",
+
+    # Nuclear / uranium / energy transition
+    "VST", "GEV", "CEG", "OKLO", "SMR", "CCJ", "UUUU", "MP",
+    "LAC", "BE", "FLNC", "ENPH", "CSIQ", "QS",
+
+    # Biotech / healthcare momentum
+    "HIMS", "BEAM", "RXRX", "DNA", "CRSP", "NTLA", "EDIT", "VKTX",
+
+    # Consumer / internet / IPO style
+    "RDDT", "ROKU", "UBER", "ABNB", "DASH", "DUOL", "CAVA",
+    "ELF", "CELH", "SHOP", "MELI", "SE",
+
+    # Extra user high-vol names
+    "AAOI", "IONQ", "RGTI", "APLD", "CRCL", "BB", "NOK",
+    "GILT", "USAR", "VICR", "PRIM", "TPB", "PL", "SIM",
+]
+
+
+BROAD_UNIVERSE = [
+    # Mega cap / QQQ / SPY core
+    "AAPL", "MSFT", "GOOGL", "GOOG", "META", "AMZN", "TSLA",
+    "COST", "NFLX", "AVGO", "NVDA", "AMD", "QCOM", "TXN",
+    "INTC", "AMAT", "LRCX", "ASML", "PANW", "NOW", "CRM",
+    "ORCL", "ADBE", "INTU", "AMGN", "REGN", "VRTX", "ISRG",
+    "MELI", "BKNG", "PYPL", "ADSK", "TEAM", "DDOG", "WDAY",
+    "MDB", "ZS",
+
+    # Financials / payment
+    "JPM", "BAC", "GS", "MS", "C", "WFC", "V", "MA", "AXP",
+    "BLK", "BK", "AIG", "AIZ", "AJG", "AON", "ALL", "CB",
+    "CBOE", "COF", "DFS", "ICE", "NDAQ", "NTRS", "MMC",
+    "MET", "MTB", "FITB", "HBAN", "KEY", "CINF", "HIG",
+
+    # Healthcare / biotech / pharma
+    "LLY", "NVO", "JNJ", "UNH", "MRK", "ABBV", "PFE", "TMO",
+    "ABT", "MDT", "BDX", "BIIB", "BMY", "BSX", "CAH", "CI",
+    "CNC", "COO", "CRL", "CVS", "DHR", "DGX", "DVA", "DXCM",
+    "EW", "GILD", "HCA", "HOLX", "HUM", "IDXX", "INCY",
+    "IQV", "LH", "MCK", "MRNA", "PODD", "SYK", "ZBH",
+
+    # Industrials / defense / aerospace
+    "GE", "CAT", "BA", "HON", "LMT", "RTX", "NOC", "GD",
+    "AXON", "ETN", "EMR", "DE", "CMI", "DOV", "FAST", "FDX",
+    "UPS", "JBHT", "LDOS", "LHX", "HWM", "HII", "IR", "JCI",
+    "MAS", "MMM", "MSI", "PH", "ROK", "TXT", "URI",
+
+    # Energy / materials
+    "XOM", "CVX", "COP", "SLB", "BKR", "APA", "DVN", "EOG",
+    "HAL", "HES", "MPC", "OKE", "FCX", "NEM", "NUE", "ALB",
+    "APD", "CF", "DD", "DOW", "EMN", "FMC", "IP", "LYB",
+    "MOS", "MLM", "VMC",
+
+    # Consumer / retail / restaurants
+    "WMT", "TGT", "HD", "LOW", "NKE", "SBUX", "MCD", "KO",
+    "PEP", "PM", "MO", "COST", "TJX", "DG", "DLTR", "DPZ",
+    "DRI", "EBAY", "ETSY", "EXPE", "BBY", "AZO", "KMX",
+    "MGM", "HLT", "MAR", "LVS", "WYNN", "CMG", "YUM",
+
+    # Staples / defensive
+    "CL", "CLX", "KMB", "KHC", "MDLZ", "MNST", "GIS", "HSY",
+    "HRL", "MKC", "CPB", "CAG", "CHD", "K", "ADM",
+
+    # Utilities / REITs
+    "DUK", "NEE", "SO", "D", "AEP", "EXC", "ED", "ES", "ETR",
+    "FE", "CMS", "CNP", "ATO", "AWK", "AEE", "SRE",
+    "AMT", "CCI", "DLR", "EQIX", "O", "PLD", "SPG", "VTR",
+    "AVB", "EQR", "ESS", "EXR", "FRT", "KIM", "MAA",
+
+    # Communication / media
+    "DIS", "CMCSA", "CHTR", "EA", "TTWO", "TMUS", "VZ", "T",
+    "FOXA", "FOX", "NWS", "NWSA", "WBD",
+
+    # Tech broad
+    "ACN", "ADI", "AKAM", "ANSS", "APH", "CDNS", "CDW", "CSCO",
+    "CSX", "CTSH", "EA", "EPAM", "FFIV", "FICO", "FSLR",
+    "GEN", "GLW", "HPE", "HPQ", "IBM", "INTC", "IPGP",
+    "JNPR", "KEYS", "KLAC", "MCHP", "MPWR", "MSCI", "MSI",
+    "NTAP", "NXPI", "ON", "PAYC", "PTC", "SNPS", "STX",
+    "SWKS", "TEL", "TER", "TRMB", "TYL", "VRSN", "WDC",
+    "ZBRA",
+]
+
+
+def get_default_stock_universe(mode: str = DEFAULT_UNIVERSE_MODE) -> List[str]:
+    """
+    Internal fallback universe.
+    This lets the screener work even if YAML universe is empty.
+    """
+    mode = str(mode).lower().strip()
+
+    if mode == "momentum":
+        return MOMENTUM_UNIVERSE
+
+    if mode == "broad":
+        return BROAD_UNIVERSE
+
+    if mode == "combined":
+        return MOMENTUM_UNIVERSE + BROAD_UNIVERSE
+
+    logger.warning(f"Unknown universe mode '{mode}', using combined universe")
+    return MOMENTUM_UNIVERSE + BROAD_UNIVERSE
+
+
+def clean_ticker_universe(tickers_list: Optional[List[str]]) -> List[str]:
+    """
+    Clean ticker list:
+    - use internal fallback if empty
+    - remove duplicates
+    - normalize BRK.B -> BRK-B
+    - remove stale / invalid tickers
+    - basic ticker sanity check
+    """
+    if not tickers_list:
+        tickers_list = get_default_stock_universe(DEFAULT_UNIVERSE_MODE)
+
+    original_count = len(tickers_list)
+    cleaned = []
+    seen = set()
+
+    for raw_ticker in tickers_list:
+        if raw_ticker is None:
+            continue
+
+        ticker = str(raw_ticker).upper().strip()
+
+        if not ticker:
+            continue
+
+        ticker = ticker.split("#")[0].strip()
+        ticker = ticker.replace(".", "-")
+
+        if not ticker:
+            continue
+
+        if ticker in seen:
+            continue
+
+        seen.add(ticker)
+
+        if ticker in INVALID_TICKERS:
+            logger.info(f"Skipping invalid/stale ticker: {ticker}")
+            continue
+
+        if not ticker.replace("-", "").isalnum():
+            logger.info(f"Skipping malformed ticker: {ticker}")
+            continue
+
+        cleaned.append(ticker)
+
+    logger.info(
+        f"Universe cleaned: {original_count} raw tickers -> {len(cleaned)} usable tickers"
+    )
+
+    return cleaned
+
+
+# =========================================================
+# Data Helpers
+# =========================================================
 
 def _clean_price_df(price_df: pd.DataFrame) -> pd.DataFrame:
     """
     Standardize price dataframe.
-    Requires: Open, High, Low, Close, Volume if available.
+    Needs High, Low, Close.
+    Volume is optional but strongly preferred.
     """
     if price_df is None or price_df.empty:
         return pd.DataFrame()
@@ -91,24 +325,35 @@ def _clean_price_df(price_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _safe_pct_change(current: float, previous: float) -> float:
-    if previous is None or previous == 0 or np.isnan(previous):
+    if previous is None:
         return 0.0
+
+    if pd.isna(previous) or previous == 0:
+        return 0.0
+
     return ((current - previous) / previous) * 100.0
 
 
 def _rolling_sma(series: pd.Series, window: int) -> Optional[float]:
     if len(series) < window:
         return None
+
     value = series.rolling(window=window).mean().iloc[-1]
+
     if pd.isna(value):
         return None
+
     return float(value)
 
+
+# =========================================================
+# Metrics
+# =========================================================
 
 def calculate_adr(price_df: pd.DataFrame, period: int = 20) -> float:
     """
     ADR = Average Daily Range %.
-    Formula: average((High - Low) / Close * 100)
+    Higher ADR is better for Qullamaggie-style momentum trading.
     """
     df = _clean_price_df(price_df)
 
@@ -127,7 +372,8 @@ def calculate_adr(price_df: pd.DataFrame, period: int = 20) -> float:
 
 def calculate_avg_dollar_volume(price_df: pd.DataFrame, period: int = 20) -> float:
     """
-    Average Dollar Volume = average(Close * Volume)
+    Average Dollar Volume = average Close * Volume.
+    Avoids illiquid small stocks.
     """
     df = _clean_price_df(price_df)
 
@@ -150,16 +396,20 @@ def calculate_avg_dollar_volume(price_df: pd.DataFrame, period: int = 20) -> flo
 
 def calculate_returns(price_df: pd.DataFrame) -> Dict[str, float]:
     """
-    Calculate 1M / 3M / 6M returns.
-    Approx trading days:
-    - 1M = 21 days
-    - 3M = 63 days
-    - 6M = 126 days
+    1M / 3M / 6M returns.
+    Uses trading day approximations:
+    - 21 days
+    - 63 days
+    - 126 days
     """
     df = _clean_price_df(price_df)
 
     if df.empty:
-        return {"ret_1m": 0.0, "ret_3m": 0.0, "ret_6m": 0.0}
+        return {
+            "ret_1m": 0.0,
+            "ret_3m": 0.0,
+            "ret_6m": 0.0,
+        }
 
     close = df["Close"]
     current = float(close.iloc[-1])
@@ -167,6 +417,7 @@ def calculate_returns(price_df: pd.DataFrame) -> Dict[str, float]:
     def get_return(days: int) -> float:
         if len(close) <= days:
             return 0.0
+
         previous = float(close.iloc[-days])
         return _safe_pct_change(current, previous)
 
@@ -188,6 +439,7 @@ def calculate_distance_from_52w_high(price_df: pd.DataFrame) -> float:
         return 999.0
 
     recent = df.iloc[-252:] if len(df) >= 252 else df
+
     current = float(df["Close"].iloc[-1])
     high_52w = float(recent["High"].max())
 
@@ -195,6 +447,7 @@ def calculate_distance_from_52w_high(price_df: pd.DataFrame) -> float:
         return 999.0
 
     distance = ((high_52w - current) / high_52w) * 100.0
+
     return float(distance)
 
 
@@ -204,8 +457,8 @@ def calculate_relative_strength(
     period: int = 63
 ) -> float:
     """
-    Relative strength vs benchmark over selected period.
-    Positive means stock outperformed benchmark.
+    Relative strength vs SPY / QQQ.
+    Positive means the stock outperformed benchmark.
     """
     stock_df = _clean_price_df(stock_df)
 
@@ -231,13 +484,12 @@ def calculate_relative_strength(
 
 def calculate_volume_dry_up(price_df: pd.DataFrame) -> float:
     """
-    Volume dry-up score.
-    Qullamaggie-style bases often have reduced volume during consolidation.
+    Volume dry-up during consolidation.
 
     Score:
-    - Recent 5D volume < 60% of previous 20D average = 100
-    - < 80% = 70
-    - < 100% = 40
+    - recent 5D volume <= 60% of previous 20D average = 100
+    - <= 80% = 70
+    - <= 100% = 40
     - otherwise = 0
     """
     df = _clean_price_df(price_df)
@@ -270,7 +522,6 @@ def calculate_volume_dry_up(price_df: pd.DataFrame) -> float:
 
 def detect_volume_spike_simple(price_df: pd.DataFrame) -> bool:
     """
-    Breakout-style volume spike.
     Today's volume > 1.5x previous 20-day average.
     """
     df = _clean_price_df(price_df)
@@ -294,14 +545,11 @@ def detect_volume_spike_simple(price_df: pd.DataFrame) -> bool:
 
 def estimate_pivot_stop_risk(price_df: pd.DataFrame) -> Dict[str, Optional[float]]:
     """
-    Estimate pivot, stop and risk.
+    Simple pivot / stop / risk estimate.
 
-    Simple logic:
-    - Pivot = highest high in last 10 trading days
-    - Stop = lowest low in last 10 trading days
-    - Risk % = (pivot - stop) / pivot * 100
-
-    This is not perfect, but useful for Telegram watchlist.
+    Pivot = highest high in last 10 days.
+    Stop = lowest low in last 10 days.
+    Risk % = (pivot - stop) / pivot.
     """
     df = _clean_price_df(price_df)
 
@@ -313,6 +561,7 @@ def estimate_pivot_stop_risk(price_df: pd.DataFrame) -> Dict[str, Optional[float
         }
 
     recent = df.iloc[-10:]
+
     pivot = float(recent["High"].max())
     stop = float(recent["Low"].min())
 
@@ -328,9 +577,9 @@ def estimate_pivot_stop_risk(price_df: pd.DataFrame) -> Dict[str, Optional[float
     }
 
 
-# ---------------------------------------------------------
-# Scoring Functions
-# ---------------------------------------------------------
+# =========================================================
+# Scoring
+# =========================================================
 
 def calculate_momentum_score(
     price_df: pd.DataFrame,
@@ -339,9 +588,6 @@ def calculate_momentum_score(
 ) -> Tuple[float, Dict[str, float]]:
     """
     Qullamaggie-style momentum score.
-
-    This is stricter than the old version.
-    It avoids giving too much score just because price is above moving averages.
     """
     df = _clean_price_df(price_df)
 
@@ -374,7 +620,7 @@ def calculate_momentum_score(
     if sma_200 and current_price > sma_200:
         score += 8
 
-    # Returns score: max 30
+    # Return score: max 30
     if returns["ret_1m"] >= 20:
         score += 10
     elif returns["ret_1m"] >= 10:
@@ -390,7 +636,7 @@ def calculate_momentum_score(
     elif returns["ret_6m"] >= 50:
         score += 4
 
-    # Distance from 52W high: max 15
+    # Near 52-week high: max 15
     if distance_52w <= 5:
         score += 15
     elif distance_52w <= 10:
@@ -413,9 +659,12 @@ def calculate_momentum_score(
     elif rs_qqq > 0:
         score += 3
 
-    # Current price above short MAs but not too extended: max 10
+    # Not too extended from 10SMA: max 10
+    extension_from_10sma = 999.0
+
     if sma_10:
-        extension_from_10sma = ((current_price - sma_10) / sma_10) * 100
+        extension_from_10sma = ((current_price - sma_10) / sma_10) * 100.0
+
         if 0 <= extension_from_10sma <= 8:
             score += 10
         elif 8 < extension_from_10sma <= 15:
@@ -433,6 +682,7 @@ def calculate_momentum_score(
         "distance_52w": distance_52w,
         "rs_spy": rs_spy,
         "rs_qqq": rs_qqq,
+        "extension_from_10sma": extension_from_10sma,
     }
 
     return min(score, 100.0), details
@@ -440,15 +690,14 @@ def calculate_momentum_score(
 
 def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[str, float]]:
     """
-    Detect high tight consolidation.
+    High tight consolidation score.
 
-    Important:
-    Low volatility alone is NOT enough.
-    We also reward:
-    - being near 52W high
-    - previous impulse
+    Low volatility alone is not enough.
+    Score also rewards:
+    - prior impulse
+    - near 52W high
     - volume dry-up
-    - controlled risk
+    - manageable risk
     """
     df = _clean_price_df(price_df)
 
@@ -457,7 +706,6 @@ def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[s
 
     current_price = float(df["Close"].iloc[-1])
 
-    # Last 10-day range
     recent_10 = df.iloc[-10:]
     high_10 = float(recent_10["High"].max())
     low_10 = float(recent_10["Low"].min())
@@ -467,13 +715,13 @@ def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[s
 
     range_10_pct = ((high_10 - low_10) / low_10) * 100.0
 
-    # Previous impulse move: compare current price to price 50 trading days ago
     price_50_days_ago = float(df["Close"].iloc[-50])
     impulse_50d = _safe_pct_change(current_price, price_50_days_ago)
 
     distance_52w = calculate_distance_from_52w_high(df)
     dry_up_score = calculate_volume_dry_up(df)
     pivot_data = estimate_pivot_stop_risk(df)
+
     risk_pct = pivot_data.get("risk_pct")
 
     score = 0.0
@@ -532,13 +780,16 @@ def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[s
     return min(score, 100.0), details
 
 
+# =========================================================
+# Reason Builder
+# =========================================================
+
 def build_reasons(
-    ticker: str,
     metrics: Dict[str, float],
     hard_rejects: List[str]
 ) -> Tuple[str, str]:
     """
-    Human-readable reason_in and reason_out for Telegram.
+    Human-readable reason_in / reason_out for Telegram.
     """
     reason_in = []
     reason_out = []
@@ -547,7 +798,7 @@ def build_reasons(
         reason_in.append(f"ADR {metrics['adr_20']:.1f}%")
 
     if metrics.get("avg_dollar_volume", 0) >= MIN_AVG_DOLLAR_VOLUME:
-        reason_in.append(f"流動性足夠 ${metrics['avg_dollar_volume'] / 1_000_000:.1f}M")
+        reason_in.append(f"流動性 ${metrics['avg_dollar_volume'] / 1_000_000:.1f}M")
 
     if metrics.get("ret_3m", 0) >= MIN_3M_RETURN:
         reason_in.append(f"3M +{metrics['ret_3m']:.1f}%")
@@ -579,9 +830,9 @@ def build_reasons(
     return "；".join(reason_in), "；".join(reason_out)
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Main Screener
-# ---------------------------------------------------------
+# =========================================================
 
 def screen_candidates(
     db: StockDatabase,
@@ -593,16 +844,23 @@ def screen_candidates(
     """
     Main screening function.
 
-    Notes:
-    - value_weight = momentum score weight
-    - support_weight = setup / consolidation score weight
+    Backward-compatible with original repo:
+    - same function name
+    - same core arguments
+    - returns DataFrame
+    - keeps old output columns:
+        value_score
+        support_score
+        buy_signal
+        nearest_support
 
-    Returns:
-    DataFrame sorted by buy_signal.
+    If tickers_list is empty, uses internal DEFAULT_UNIVERSE_MODE.
     """
 
+    tickers_list = clean_ticker_universe(tickers_list)
+
     if not tickers_list:
-        logger.warning("Empty ticker list provided")
+        logger.warning("No valid tickers after cleaning")
         return pd.DataFrame()
 
     logger.info(f"Screening {len(tickers_list)} candidates...")
@@ -613,7 +871,7 @@ def screen_candidates(
     start_date = end_date - timedelta(days=min_data_days + 180)
 
     # -----------------------------------------------------
-    # Load benchmark data for RS calculation
+    # Load benchmark data
     # -----------------------------------------------------
 
     spy_history = pd.DataFrame()
@@ -640,23 +898,12 @@ def screen_candidates(
         logger.warning(f"Could not load QQQ benchmark: {e}")
 
     # -----------------------------------------------------
-    # Screening Loop
+    # Screening loop
     # -----------------------------------------------------
 
     for ticker in tickers_list:
         try:
-            ticker = ticker.upper().strip()
-
-            if not ticker:
-                continue
-
             hard_rejects = []
-
-            if ticker in INVALID_TICKERS:
-                logger.info(f"{ticker}: skipped because ticker is marked invalid/stale")
-                continue
-
-            logger.debug(f"Processing {ticker}...")
 
             fundamentals = db.get_latest_fundamentals(ticker)
 
@@ -673,7 +920,9 @@ def screen_candidates(
             price_history = _clean_price_df(price_history)
 
             if price_history.empty or len(price_history) < min_data_days:
-                logger.warning(f"Insufficient price data for {ticker}: {len(price_history)} days")
+                logger.warning(
+                    f"Insufficient price data for {ticker}: {len(price_history)} days"
+                )
                 continue
 
             current_price = fundamentals.get("current_price")
@@ -688,7 +937,7 @@ def screen_candidates(
             current_price = float(current_price)
 
             # -------------------------------------------------
-            # Core Metrics
+            # Metrics
             # -------------------------------------------------
 
             adr_20 = calculate_adr(price_history, period=20)
@@ -702,14 +951,18 @@ def screen_candidates(
                 qqq_df=qqq_history
             )
 
-            consolidation_score, consolidation_details = calculate_consolidation_score(price_history)
+            consolidation_score, consolidation_details = calculate_consolidation_score(
+                price_history
+            )
 
             pivot_data = estimate_pivot_stop_risk(price_history)
             volume_spike = detect_volume_spike_simple(price_history)
 
             rsi = None
+
             if len(price_history) >= 15:
                 rsi_series = calculate_rsi(price_history["Close"], period=14)
+
                 if not rsi_series.isna().all():
                     rsi = float(rsi_series.iloc[-1])
 
@@ -718,8 +971,10 @@ def screen_candidates(
             sma_50 = _rolling_sma(price_history["Close"], 50)
             sma_200 = _rolling_sma(price_history["Close"], 200)
 
+            risk_pct = pivot_data.get("risk_pct")
+
             # -------------------------------------------------
-            # Hard Rejects
+            # Hard rejects
             # -------------------------------------------------
 
             if current_price < MIN_PRICE:
@@ -729,7 +984,9 @@ def screen_candidates(
                 hard_rejects.append(f"ADR太低 {adr_20:.1f}%")
 
             if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
-                hard_rejects.append(f"成交額不足 ${avg_dollar_volume / 1_000_000:.1f}M")
+                hard_rejects.append(
+                    f"成交額不足 ${avg_dollar_volume / 1_000_000:.1f}M"
+                )
 
             if distance_52w > MAX_DISTANCE_FROM_52W_HIGH:
                 hard_rejects.append(f"離52週高位太遠 {distance_52w:.1f}%")
@@ -739,8 +996,6 @@ def screen_candidates(
                     f"動能不足 1M {returns['ret_1m']:.1f}% / 3M {returns['ret_3m']:.1f}%"
                 )
 
-            risk_pct = pivot_data.get("risk_pct")
-
             if risk_pct is not None and risk_pct > MAX_SETUP_RISK_PCT:
                 hard_rejects.append(f"setup風險太闊 {risk_pct:.1f}%")
 
@@ -748,25 +1003,23 @@ def screen_candidates(
                 hard_rejects.append("跌穿20日線")
 
             # -------------------------------------------------
-            # Buy Signal Score
+            # Final score
             # -------------------------------------------------
 
-            buy_signal = (momentum_score * value_weight) + (consolidation_score * support_weight)
+            buy_signal = (
+                momentum_score * value_weight
+                + consolidation_score * support_weight
+            )
 
-            # Bonus only if already passing basic volatility/liquidity conditions
+            # Volume bonus only when conditions are already decent
             if volume_spike and adr_20 >= MIN_ADR_20 and consolidation_score >= 50:
                 buy_signal += 5
 
-            # Penalty for hard rejects
-            # Important: not always immediate delete, but strongly demote.
+            # Penalize hard rejects instead of deleting immediately
             penalty = len(hard_rejects) * 18
             buy_signal -= penalty
 
             buy_signal = max(0.0, min(buy_signal, 100.0))
-
-            # -------------------------------------------------
-            # Metrics for output
-            # -------------------------------------------------
 
             metrics = {
                 "adr_20": adr_20,
@@ -777,15 +1030,18 @@ def screen_candidates(
                 "distance_52w": distance_52w,
                 "range_10_pct": consolidation_details.get("range_10_pct", 999.0),
                 "impulse_50d": consolidation_details.get("impulse_50d", 0.0),
-                "volume_dry_up_score": consolidation_details.get("volume_dry_up_score", 0.0),
+                "volume_dry_up_score": consolidation_details.get(
+                    "volume_dry_up_score",
+                    0.0
+                ),
                 "risk_pct": risk_pct if risk_pct is not None else 999.0,
                 "volume_spike": volume_spike,
             }
 
-            reason_in, reason_out = build_reasons(ticker, metrics, hard_rejects)
+            reason_in, reason_out = build_reasons(metrics, hard_rejects)
 
             # -------------------------------------------------
-            # Result Row
+            # Append result
             # -------------------------------------------------
 
             results.append({
@@ -795,10 +1051,23 @@ def screen_candidates(
 
                 "current_price": round(current_price, 2),
 
+                # -------------------------------------------------
+                # Old repo-compatible names
+                # -------------------------------------------------
+                "value_score": round(momentum_score, 2),
+                "support_score": round(consolidation_score, 2),
                 "buy_signal": round(buy_signal, 2),
+                "nearest_support": round(sma_10, 2) if sma_10 is not None else None,
+
+                # -------------------------------------------------
+                # New clearer names
+                # -------------------------------------------------
                 "momentum_score": round(momentum_score, 2),
                 "consolidation_score": round(consolidation_score, 2),
 
+                # -------------------------------------------------
+                # Qullamaggie metrics
+                # -------------------------------------------------
                 "adr_20": round(adr_20, 2),
                 "avg_dollar_volume_m": round(avg_dollar_volume / 1_000_000, 2),
 
@@ -811,9 +1080,18 @@ def screen_candidates(
                 "rs_spy": round(momentum_details.get("rs_spy", 0.0), 2),
                 "rs_qqq": round(momentum_details.get("rs_qqq", 0.0), 2),
 
-                "range_10_pct": round(consolidation_details.get("range_10_pct", 999.0), 2),
-                "impulse_50d": round(consolidation_details.get("impulse_50d", 0.0), 2),
-                "volume_dry_up_score": round(consolidation_details.get("volume_dry_up_score", 0.0), 2),
+                "range_10_pct": round(
+                    consolidation_details.get("range_10_pct", 999.0),
+                    2
+                ),
+                "impulse_50d": round(
+                    consolidation_details.get("impulse_50d", 0.0),
+                    2
+                ),
+                "volume_dry_up_score": round(
+                    consolidation_details.get("volume_dry_up_score", 0.0),
+                    2
+                ),
                 "volume_spike": volume_spike,
 
                 "pivot": pivot_data.get("pivot"),
@@ -850,28 +1128,37 @@ def screen_candidates(
             logger.error(f"Error screening {ticker}: {e}")
             continue
 
+    # -----------------------------------------------------
+    # Final output
+    # -----------------------------------------------------
+
     if not results:
         logger.warning("No valid screening results")
         return pd.DataFrame()
 
     df = pd.DataFrame(results)
 
-    # Keep only meaningful candidates.
-    # You can change 50 to 40 if too few results.
-    df = df[df["buy_signal"] >= 50].copy()
+    df = df[df["buy_signal"] >= MIN_BUY_SIGNAL].copy()
 
     if df.empty:
         logger.warning("No candidates passed minimum buy_signal threshold")
         return pd.DataFrame()
 
-    # Better ranking:
-    # 1. Higher buy signal
-    # 2. Fewer hard rejects
-    # 3. Higher ADR
-    # 4. Stronger 3M return
     df = df.sort_values(
-        by=["buy_signal", "hard_reject_count", "adr_20", "ret_3m"],
-        ascending=[False, True, False, False]
+        by=[
+            "buy_signal",
+            "hard_reject_count",
+            "adr_20",
+            "ret_3m",
+            "distance_52w",
+        ],
+        ascending=[
+            False,
+            True,
+            False,
+            False,
+            True,
+        ]
     ).reset_index(drop=True)
 
     logger.info(f"Successfully screened {len(df)} candidates after filters")
