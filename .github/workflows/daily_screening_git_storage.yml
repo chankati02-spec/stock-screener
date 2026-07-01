@@ -64,6 +64,10 @@ jobs:
           MAX_SETUP_RISK_PCT = 12.0
           MIN_BUY_SIGNAL = 50.0
 
+          # If latest daily candle is older than this, skip.
+          # 3 days handles weekends. If you want stricter, change to 2.
+          MAX_STALE_DAYS = 3
+
           INVALID_TICKERS = {
               "INFO", "ATVI", "ALXN", "CELG", "CTXS", "MXIM", "NUAN",
               "ABC", "BLL", "COG", "DISCA", "DISCK", "DRE", "FISV",
@@ -110,6 +114,39 @@ jobs:
               if previous is None or previous == 0 or pd.isna(previous):
                   return 0.0
               return ((current - previous) / previous) * 100.0
+
+
+          def is_stale_price_data(df, max_stale_days=MAX_STALE_DAYS):
+              """
+              Returns:
+              - is_stale: True / False
+              - price_date: YYYY-MM-DD string
+              - age_days: number of days from latest candle to today UTC
+              """
+              if df is None or df.empty:
+                  return True, None, None
+
+              clean_df = df.dropna(subset=["Close"])
+
+              if clean_df.empty:
+                  return True, None, None
+
+              last_date = clean_df.index[-1]
+
+              try:
+                  last_date = pd.Timestamp(last_date)
+
+                  if last_date.tzinfo is not None:
+                      last_date = last_date.tz_convert(None)
+
+                  last_date_only = last_date.date()
+                  today_utc = datetime.utcnow().date()
+                  age_days = (today_utc - last_date_only).days
+
+                  return age_days > max_stale_days, last_date_only.strftime("%Y-%m-%d"), age_days
+
+              except Exception:
+                  return True, None, None
 
 
           def calculate_adr(df, period=20):
@@ -498,7 +535,21 @@ jobs:
           spy_df = spy_df.dropna(subset=["Close"])
           qqq_df = qqq_df.dropna(subset=["Close"])
 
+          spy_stale, spy_date, spy_age = is_stale_price_data(spy_df)
+          qqq_stale, qqq_date, qqq_age = is_stale_price_data(qqq_df)
+
+          print(f"SPY latest candle: {spy_date}, age: {spy_age} days")
+          print(f"QQQ latest candle: {qqq_date}, age: {qqq_age} days")
+
+          if spy_stale:
+              print(f"WARNING: SPY benchmark is stale. Last candle = {spy_date}")
+
+          if qqq_stale:
+              print(f"WARNING: QQQ benchmark is stale. Last candle = {qqq_date}")
+
           results = []
+          stale_count = 0
+          skipped_count = 0
 
           # =====================================================
           # Batch download stocks
@@ -531,6 +582,7 @@ jobs:
                           df = data.copy()
                       else:
                           if ticker not in data.columns.levels[0]:
+                              skipped_count += 1
                               continue
                           df = data[ticker].copy()
 
@@ -538,12 +590,25 @@ jobs:
                       df = df.dropna(subset=["Close", "High", "Low"])
 
                       if df.empty or len(df) < 220:
+                          skipped_count += 1
+                          continue
+
+                      # =================================================
+                      # STALE DATA CHECK
+                      # =================================================
+
+                      is_stale, price_date, age_days = is_stale_price_data(df)
+
+                      if is_stale:
+                          stale_count += 1
+                          print(f"{ticker} skipped: stale price data. Last candle = {price_date}, age = {age_days} days")
                           continue
 
                       close_prices = df["Close"]
                       current_price = float(close_prices.iloc[-1])
 
                       if current_price < MIN_PRICE:
+                          skipped_count += 1
                           continue
 
                       adr_20 = calculate_adr(df, period=20)
@@ -554,25 +619,30 @@ jobs:
 
                       # =================================================
                       # CRITICAL HARD FILTERS
-                      # These names are not allowed into Telegram.
                       # =================================================
 
                       if adr_20 < MIN_ADR_20:
+                          skipped_count += 1
                           continue
 
                       if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
+                          skipped_count += 1
                           continue
 
                       if distance_52w > MAX_DISTANCE_FROM_52W_HIGH:
+                          skipped_count += 1
                           continue
 
                       if risk_pct is None:
+                          skipped_count += 1
                           continue
 
                       if risk_pct > MAX_SETUP_RISK_PCT:
+                          skipped_count += 1
                           continue
 
                       if returns["ret_1m"] < 10 and returns["ret_3m"] < 25:
+                          skipped_count += 1
                           continue
 
                       momentum_score, momentum_details = calculate_momentum_score(
@@ -594,6 +664,7 @@ jobs:
                       buy_signal = max(0.0, min(buy_signal, 100.0))
 
                       if buy_signal < MIN_BUY_SIGNAL:
+                          skipped_count += 1
                           continue
 
                       metrics = {
@@ -615,6 +686,8 @@ jobs:
                       results.append({
                           "ticker": ticker,
                           "current_price": round(current_price, 2),
+                          "price_date": price_date,
+                          "age_days": age_days,
                           "buy_signal": round(buy_signal, 2),
                           "momentum_score": round(momentum_score, 2),
                           "consolidation_score": round(consolidation_score, 2),
@@ -634,6 +707,7 @@ jobs:
 
                   except Exception as e:
                       print(f"{ticker} 處理失敗: {e}")
+                      skipped_count += 1
                       continue
 
           # =====================================================
@@ -642,6 +716,8 @@ jobs:
 
           token = os.getenv("TELEGRAM_TOKEN")
           chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+          run_date = datetime.utcnow().strftime("%Y-%m-%d UTC")
 
           if results:
               df_res = pd.DataFrame(results)
@@ -653,13 +729,16 @@ jobs:
 
               top_picks = df_res.head(15)
 
-              msg = "🚀 【Qullamaggie 強勢股火箭監測｜Hard Filter版】 🚀\n\n"
-              msg += f"日期：{datetime.utcnow().strftime('%Y-%m-%d UTC')}\n"
+              msg = "🚀 【Qullamaggie 強勢股火箭監測｜Hard Filter + Fresh Data版】 🚀\n\n"
+              msg += f"Run Date：{run_date}\n"
               msg += f"入選數量：{len(df_res)}\n"
-              msg += "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%\n\n"
+              msg += f"Stale skipped：{stale_count}\n"
+              msg += f"Other skipped：{skipped_count}\n"
+              msg += "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%、Fresh candle\n\n"
 
               for idx, row in top_picks.iterrows():
-                  msg += f"#{idx + 1} 股票: {row['ticker']} (${row['current_price']})\n"
+                  msg += f"#{idx + 1} 股票: {row['ticker']}\n"
+                  msg += f"   Close: ${row['current_price']} | Close Date: {row['price_date']} | Age: {row['age_days']}d\n"
                   msg += f"   📈 總評分: {row['buy_signal']:.1f} | 動能: {row['momentum_score']:.1f} | 整理: {row['consolidation_score']:.1f}\n"
                   msg += f"   ⚡ ADR: {row['adr_20']:.1f}% | 3M: {row['ret_3m']:.1f}% | 距52W高: {row['distance_52w']:.1f}%\n"
                   msg += f"   🎯 Pivot: {row['pivot']} | Stop: {row['stop']} | Risk: {row['risk_pct']}%\n"
@@ -673,14 +752,18 @@ jobs:
                       print("✓ Telegram 訊號推送成功！")
                   else:
                       print(f"Telegram 推送失敗: {response.status_code} {response.text}")
+                      print(msg)
               else:
                   print("缺少 TELEGRAM_TOKEN 或 TELEGRAM_CHAT_ID")
                   print(msg)
 
           else:
               msg = (
-                  "今日全市場無符合 Hard Filter Qullamaggie 條件的股票。\n\n"
-                  "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%、Buy Signal≥50"
+                  "今日全市場無符合 Hard Filter + Fresh Data Qullamaggie 條件的股票。\n\n"
+                  f"Run Date：{run_date}\n"
+                  f"Stale skipped：{stale_count}\n"
+                  f"Other skipped：{skipped_count}\n"
+                  "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%、Buy Signal≥50、Fresh candle"
               )
 
               if token and chat_id:
