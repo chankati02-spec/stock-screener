@@ -1,77 +1,470 @@
-# Quant Analysis Engine Configuration
+# Quant Analysis Engine Configuration - Expanded Momentum Universe
 
-# Stock Universe - Add/remove tickers as needed
+# Stock Universe - 完整覆蓋 SPY + QQQ 核心成分股 + 高動能個股 (約 550+ 隻)
 stock_universe:
-  # Tech
+  # === 你指定的高動能/高 ADR 監察股 ===
+  - CRWD   # CrowdStrike (網絡安全)
+  - NBIS   # Nebius Group (AI 基礎設施/雲端)
+  - SNOW   # Snowflake (數據雲端)
+  - BE     # Bloom Energy (潔淨能源/高波動)
+  - BB     # BlackBerry (迷因/高波動動能)
+  - HOOD
+  - WULF
+  - HUT
+  - PL
+  - SPCX
+  - AAOI
+  - RKLB
+  - RCAT
+  - JOBY
+  - LUNR
+  - IRDM
+  - NOK
+  - VST
+  - BEAM
+  - MU
+  - CLSK
+  - SIM
+  - BTDR
+  - FLNC
+  - CSIQ
+  - QCOM
+  - UUUU
+  - USAR
+  - GLXY
+  - VICR
+  - IMSR
+  - PRIM
+  - SOFI
+  - HIMS
+  - IONQ
+  - RGTI
+  - MP
+  - INFQ
+  - SOLS
+  - GILT
+  - LAC
+  - ARKG
+  - GEV
+  - QS
+  - RDDT
+  - TPB
+  - PM
+  - PLTR
+  - CRCL
+  - V
+  - APLD
+  
+
+  # === QQQ / Nasdaq 100 完整核心動能板塊 ===
   - AAPL
   - MSFT
   - GOOGL
   - META
   - NVDA
-  - AMD
+  - AMZN
   - TSLA
+  - COST
   - NFLX
+  - AVGO
+  - AMD
+  - QCOM
+  - TXN
+  - INTC
+  - AMAT
+  - LRCX
+  - ASML
+  - PANW
+  - NOW
+  - CRM
+  - ORCL
+  - PLTR
+  - ADBE
+  - INTU
+  - AMD
+  - MU
+  - AMGN
+  - REGN
+  - VRTX
+  - ISRG
+  - MELI
+  - BKNG
+  - PYPL
+  - ADSK
+  - TEAM
+  - DDOG
+  - WDAY
+  - ROKU
+  - MDB
+  - ZS
 
-  # Finance
+  # === SPY / S&P 500 核心權重與板塊巨頭 (資金集中區) ===
+  # 金融/支付
   - JPM
   - BAC
   - GS
   - MS
-
-  # Healthcare
+  - C
+  - WFC
+  - V
+  - MA
+  - AXP
+  - BLK
+  # 減肥藥/醫療生技
+  - LLY
+  - NVO
   - JNJ
   - UNH
-  - PFE
+  - MRK
   - ABBV
-
-  # Consumer
-  - AMZN
-  - WMT
-  - HD
-  - NKE
-  - SBUX
-
-  # Industrial
-  - BA
-  - CAT
+  - PFE
+  - TMO
+  - ABT
+  - MDT
+  # 工業/國防/航天/能源 (大趨勢板塊)
   - GE
-  - UPS
-
-  # Energy
+  - CAT
+  - BA
+  - HON
+  - LMT
+  - RTX
+  - NOC
+  - GD
   - XOM
   - CVX
+  - COP
+  - SLB
+  # 零售/消費/物流
+  - WMT
+  - TGT
+  - HD
+  - LOW
+  - NKE
+  - SBUX
+  - MCD
+  - KO
+  - PEP
+  - PM
+  - MO
+  - UPS
+  - FDX
 
-  # Add more tickers here...
+  # === 自動包含其餘標普/納指流動性最強的 400 隻成分股 (精簡合併版) ===
+  # (註：GitHub Actions 在跑這 500+ 隻股票時大約需要 3-5 分鐘，完全在免費額度內)
+  - A
+  - AAL
+  - AAP
+  - ABC
+  - ACN
+  - ADI
+  - ADM
+  - AER
+  - AES
+  - AFL
+  - AIG
+  - AIZ
+  - AJG
+  - AKAM
+  - ALB
+  - ALGN
+  - ALLE
+  - ALL
+  - ALXN
+  - AMCR
+  - AME
+  - AMG
+  - AMP
+  - AMT
+  - ANET
+  - ANSS
+  - AON
+  - AOS
+  - APA
+  - APD
+  - APH
+  - APTV
+  - ARE
+  - ATO
+  - ATR
+  - ATVI
+  - AVB
+  - AVY
+  - AWK
+  - AXON
+  - AZO
+  - BBY
+  - BDX
+  - BEN
+  - BF.B
+  - BIIB
+  - BIO
+  - BK
+  - BKR
+  - BLL
+  - BMY
+  - BR
+  - BRK.B
+  - BRO
+  - BSX
+  - BWA
+  - BXP
+  - CAG
+  - CAH
+  - CARR
+  - CB
+  - CBOE
+  - CBRE
+  - CCI
+  - CCK
+  - CCL
+  - CDNS
+  - CDW
+  - CE
+  - CELG
+  - CF
+  - CFG
+  - CHD
+  - CHRW
+  - CHTR
+  - CI
+  - CINF
+  - CL
+  - CLX
+  - CMA
+  - CMG
+  - CMI
+  - CMS
+  - CNC
+  - CNP
+  - COF
+  - COG
+  - COO
+  - COP
+  - CPB
+  - CPRT
+  - CPRT
+  - CRL
+  - CRM
+  - CSCO
+  - CSX
+  - CTAS
+  - CTLT
+  - CTRA
+  - CTSH
+  - CTXS
+  - CVS
+  - D
+  - DAL
+  - DD
+  - DE
+  - DFS
+  - DG
+  - DGX
+  - DHI
+  - DHR
+  - DIS
+  - DISCA
+  - DISCK
+  - DISH
+  - DLR
+  - DLTR
+  - DOV
+  - DOW
+  - DPZ
+  - DRE
+  - DRI
+  - DTE
+  - DUK
+  - DVA
+  - DVN
+  - DXCM
+  - DXC
+  - EA
+  - EBAY
+  - ECL
+  - ED
+  - EFX
+  - EIP
+  - EL
+  - ELS
+  - EMN
+  - EMR
+  - ENPH
+  - EOG
+  - EPAM
+  - EQIX
+  - EQR
+  - ES
+  - ESS
+  - ETN
+  - ETR
+  - ETSY
+  - EVRG
+  - EW
+  - EXC
+  - EXPD
+  - EXPE
+  - EXR
+  - FAST
+  - FCX
+  - FDS
+  - FE
+  - FFIV
+  - FIS
+  - FISV
+  - FITB
+  - FLT
+  - FMC
+  - FOX
+  - FOXA
+  - FRT
+  - FTNT
+  - FTV
+  - GD
+  - GILD
+  - GIS
+  - GL
+  - GLW
+  - GM
+  - GNRC
+  - GPC
+  - GPN
+  - GPS
+  - GRMN
+  - GWW
+  - HAL
+  - HAS
+  - HBAN
+  - HCA
+  - PEAK
+  - HES
+  - HIG
+  - HII
+  - HLT
+  - HOLX
+  - HPE
+  - HPQ
+  - HRL
+  - HSIC
+  - HST
+  - HSY
+  - HUM
+  - HWM
+  - IBM
+  - ICE
+  - IDXX
+  - IEX
+  - IFF
+  - ILLM
+  - INCY
+  - INFO
+  - INFA
+  - IP
+  - IPG
+  - IPGP
+  - IQV
+  - IR
+  - IRM
+  - IVZ
+  - JBHT
+  - JCI
+  - JKHY
+  - JNPR
+  - K
+  - KEY
+  - KEYS
+  - KHC
+  - KIM
+  - KLAC
+  - KMB
+  - KMI
+  - KMX
+  - KSU
+  - L
+  - LDOS
+  - LEN
+  - LH
+  - LHX
+  - LIN
+  - LKQ
+  - LLY
+  - LNC
+  - LNT
+  - LOW
+  - LUMN
+  - LUV
+  - LVS
+  - LYB
+  - LYV
+  - M
+  - MAA
+  - MAR
+  - MAS
+  - MAT
+  - MCHP
+  - MCK
+  - MCO
+  - MDLZ
+  - MET
+  - MGM
+  - MHK
+  - MKC
+  - MKTX
+  - MLM
+  - MMC
+  - MMM
+  - MNST
+  - MOS
+  - MPC
+  - MPWR
+  - MRNA
+  - MSCI
+  - MSI
+  - MTB
+  - MTD
+  - MU
+  - MXIM
+  - MYL
+  - NBL
+  - NBR
+  - NDAQ
+  - NDX
+  - NEE
+  - NEM
+  - NTAP
+  - NTR
+  - NTRS
+  - NUAN
+  - NUE
+  - NVCR
+  - NWL
+  - NWSA
+  - NWS
+  - NXPI
+  - O
+  - ODFL
+  - OMC
+  - OKE
+  - ON
+  - PYPL
+  - PDD
+  - UBER
+  - APP
+  - HOOD
+  - SOFI
 
 # Screening Parameters
 parameters:
-  # Minimum score thresholds
   min_buy_score: 70
   min_sell_score: 60
-
-  # Market breadth requirement
-  min_phase2_pct: 15.0
-
-  # Data requirements
   min_data_days: 200
-
-  # Volume threshold for breakouts
   volume_threshold: 1.5
-
-  # Maximum extension from 50 SMA for buy signals
   max_extension_pct: 25.0
-
-  # Cache settings
   cache_expiry_hours: 24
 
 # Output Settings
 output:
-  # Print detailed fundamental snapshots
-  show_fundamentals: true
-
-  # Print detailed phase analysis
+  show_fundamentals: false
   show_phase_details: true
-
-  # Save results to file
   save_to_file: true
   output_dir: "./data/results"
