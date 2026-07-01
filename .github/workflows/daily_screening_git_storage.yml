@@ -2,9 +2,9 @@ name: Daily Stock Screening (Git-Based Storage)
 
 on:
   schedule:
-    # 更改為 UTC 21:05執行，即香港時間凌晨 05:05 AM
-    # 正好是美股冬令時間收市後 5 分鐘，夏令時間收市後 1 小時 5 分鐘
+    # 香港時間凌晨 05:05 AM (美股收市後) 自動在雲端執行
     - cron: '5 21 * * 1-5'
+
   # 容許在 GitHub 網頁上手動按「Run workflow」觸發測試
   workflow_dispatch:
     inputs:
@@ -18,9 +18,6 @@ jobs:
   screen-stocks:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write  # 容許 GitHub Action 把更新後的緩存存回倉庫
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,201 +30,139 @@ jobs:
           echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
           echo "time=$(date +'%H:%M:%S')" >> $GITHUB_OUTPUT
 
-      - name: Check existing fundamental cache
-        id: cache-check
-        run: |
-          if [ -d "data/fundamentals_cache" ]; then
-            CACHE_COUNT=$(ls data/fundamentals_cache/*_fundamentals.json 2>/dev/null | wc -l | tr -d ' ')
-            echo "✓ Found existing fundamental cache"
-            echo "cached_stocks=$CACHE_COUNT" >> $GITHUB_OUTPUT
-            echo "  Cached stocks: $CACHE_COUNT"
-
-            # 顯示緩存的分佈情況
-            echo "  Cache age distribution:"
-            find data/fundamentals_cache -name "*_fundamentals.json" -mtime -7 -type f | wc -l | xargs echo "    <7 days:"
-            find data/fundamentals_cache -name "*_fundamentals.json" -mtime +7 -mtime -30 -type f | wc -l | xargs echo "    7-30 days:"
-            find data/fundamentals_cache -name "*_fundamentals.json" -mtime +30 -mtime -90 -type f | wc -l | xargs echo "    30-90 days:"
-            find data/fundamentals_cache -name "*_fundamentals.json" -mtime +90 -type f | wc -l xargs echo "    >90 days (stale):"
-          else
-            echo "⚠ No existing cache, will create"
-            mkdir -p data/fundamentals_cache
-            echo "cached_stocks=0" >> $GITHUB_OUTPUT
-          fi
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install requests pandas pyyaml  # 確保有我們新增的套件
+          pip install yfinance pandas numpy pyyaml requests
 
-      - name: Run optimized stock screening
-        env:
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          EMAIL_SMTP_SERVER: ${{ secrets.EMAIL_SMTP_SERVER || 'smtp.gmail.com' }}
-          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT || '587' }}
-          FORCE_FULL_REFRESH: ${{ github.event.inputs.force_full_refresh || 'false' }}
-          CACHED_STOCKS: ${{ steps.cache-check.outputs.cached_stocks }}
-        run: |
-          echo "Starting screening with:"
-          echo "  - Fresh price data for all stocks (1 year history)"
-          echo "  - Smart fundamental refresh (earnings-aware)"
-          echo "  - Cached fundamentals: $CACHED_STOCKS stocks"
-          echo ""
-
-          # 建立必要的資料夾
-          mkdir -p data/daily_scans
-          mkdir -p data/logs
-
-          # 執行原作者的優化選股引擎
-          python run_optimized_scan.py --conservative --git-storage
-
-      - name: Send Results to Telegram
-        if: success()
+      - name: Run Direct Qullamaggie Screener
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python3 << 'PYTHON_SCRIPT'
           import os
-          import glob
+          import yaml
+          import yfinance as yf
           import pandas as pd
+          import numpy as np
           import requests
+          from datetime import datetime, timedelta
 
-          token = os.getenv("TELEGRAM_TOKEN")
-          chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
-          if not token or not chat_id:
-              print("⚠ 找不到 TELEGRAM_TOKEN 或 TELEGRAM_CHAT_ID。請先到 GitHub Settings 內設定。")
-              exit(0)
-
-          # 1. 尋找原引擎跑完產生的最新 CSV 結果
-          csv_files = glob.glob("data/daily_scans/*.csv")
-          if not csv_files:
-              print("⚠ 找不到任何今日選股的 CSV 檔案。")
-              exit(0)
+          # 1. 讀取 config.yaml 的股票宇宙
+          with open('config.yaml', 'r') as f:
+              config = yaml.safe_load(f)
+          tickers = config['stock_universe']
           
-          latest_file = max(csv_files, key=os.path.getmtime)
-          print(f"正在讀取最新報告: {latest_file}")
+          # 剔除空值
+          tickers = [t for t in tickers if t and isinstance(t, str)]
+          print(f"成功載入 {len(tickers)} 隻股票，開始進行雲端直接篩選...")
 
-          try:
-              df = pd.read_csv(latest_file)
-              if df.empty:
-                  requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": chat_id, "text": "今日美股：沒有符合 Qullamaggie 條件的股票。"})
-                  exit(0)
+          results = []
+          
+          # 2. 分批下載半年歷史數據，防止被 yfinance 限流 (每批 50 隻)
+          batch_size = 50
+          for i in range(0, len(tickers), batch_size):
+              batch = tickers[i:i+batch_size]
+              tickers_str = " ".join(batch)
+              print(f"正在下載第 {i} 至 {i+len(batch)} 隻股票數據...")
+              try:
+                  data = yf.download(tickers_str, period="6mo", group_by='ticker', progress=False)
+              except Exception as e:
+                  print(f"批次 {i} 下載失敗: {e}")
+                  continue
 
-              # 2. 格式化訊息 (只取前 15 隻最強、整理最窄幅的精選股票)
-              top_picks = df.head(15)
-              msg = "🚀 【Qullamaggie 強勢股監測】 🚀\n\n"
-              
+              for ticker in batch:
+                  try:
+                      # 提取單隻股票數據
+                      if len(batch) == 1:
+                          df = data
+                      else:
+                          if ticker not in data.columns.levels[0]: continue
+                          df = data[ticker]
+                      
+                      df = df.dropna(subset=['Close'])
+                      if len(df) < 50: continue
+
+                      close_prices = df['Close']
+                      current_price = float(close_prices.iloc[-1])
+
+                      # === Qullamaggie 指標技術計算 ===
+                      sma_10 = close_prices.rolling(window=10).mean().iloc[-1]
+                      sma_20 = close_prices.rolling(window=20).mean().iloc[-1]
+                      sma_50 = close_prices.rolling(window=50).mean().iloc[-1]
+                      sma_200 = close_prices.rolling(window=200).mean().iloc[-1] if len(df) >= 200 else sma_50
+
+                      # 算動能分 (最高 70 分)
+                      momentum_score = 0.0
+                      if current_price > sma_10: momentum_score += 15
+                      if current_price > sma_20: momentum_score += 15
+                      if current_price > sma_50: momentum_score += 20
+                      if current_price > sma_200: momentum_score += 20
+
+                      price_50_days_ago = close_prices.iloc[-50] if len(df) >= 50 else close_prices.iloc[0]
+                      gain_pct = ((current_price - price_50_days_ago) / price_50_days_ago) * 100
+                      if gain_pct >= 30: momentum_score += 30
+
+                      # 算高位窄幅整理度 (最高 30 分)
+                      recent_data = df.iloc[-10:]
+                      highest = recent_data['High'].max()
+                      lowest = recent_data['Low'].min()
+                      volatility = ((highest - lowest) / lowest) * 100
+
+                      tightness_score = 0.0
+                      if volatility <= 5.0: tightness_score = 100.0
+                      elif volatility <= 10.0: tightness_score = 70.0
+                      elif volatility <= 15.0: tightness_score = 40.0
+
+                      # 檢查爆量
+                      volume_spike = False
+                      if 'Volume' in df.columns and len(df) >= 21:
+                          current_volume = df['Volume'].iloc[-1]
+                          avg_volume = df['Volume'].iloc[-21:-1].mean()
+                          if current_volume > (avg_volume * 1.5): volume_spike = True
+
+                      # 總分
+                      buy_signal = (momentum_score * 0.5) + (tightness_score * 0.5)
+                      if volume_spike and tightness_score > 50: buy_signal += 10
+                      buy_signal = min(buy_signal, 100.0)
+
+                      # 只記錄有基本動能的強勢股
+                      if buy_signal >= 50:
+                          results.append({
+                              'ticker': ticker,
+                              'current_price': round(current_price, 2),
+                              'buy_signal': buy_signal,
+                              'momentum_score': momentum_score,
+                              'tightness_score': tightness_score,
+                              'sma_10': round(sma_10, 2)
+                          })
+                  except:
+                      continue
+
+          # 3. 排序並發送 Telegram
+          if results:
+              df_res = pd.DataFrame(results)
+              df_res = df_res.sort_values('buy_signal', ascending=False).reset_index(drop=True)
+              top_picks = df_res.head(15)
+
+              token = os.getenv("TELEGRAM_TOKEN")
+              chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+              msg = "🚀 【Qullamaggie 強勢股火箭監測】 🚀\n\n"
               for idx, row in top_picks.iterrows():
-                  ticker = row.get('ticker') or row.get('Ticker') or 'UNKNOWN'
-                  buy_signal = row.get('buy_signal', 0)
-                  value_score = row.get('value_score', 0)  # 這裏已經是我們重寫的動能分
-                  support_score = row.get('support_score', 0)  # 這裏是高位窄幅整理分
-                  price = row.get('current_price', 0)
+                  msg += f"#{idx+1} 股票: {row['ticker']} (${row['current_price']})\n"
+                  msg += f"   📈 總評分: {row['buy_signal']:.1f} | 動能: {row['momentum_score']:.1f}\n"
+                  msg += f"   🔍 窄幅整理度: {row['tightness_score']:.1f} | 10日線: ${row['sma_10']}\n\n"
 
-                  msg += f"#{idx+1} 股票: {ticker} (${price})\n"
-                  msg += f"   📈 總評分: {buy_signal:.1f} | 動能: {value_score:.1f}\n"
-                  msg += f"   🔍 窄幅整理度: {support_score:.1f}\n\n"
-
-              # 3. 推送到你的 Telegram 手機 APP
               url = f"https://api.telegram.org/bot{token}/sendMessage"
               requests.post(url, data={"chat_id": chat_id, "text": msg})
               print("✓ Telegram 訊號推送成功！")
-
-          except Exception as e:
-              print(f"發送 Telegram 出現錯誤: {e}")
+          else:
+              print("今日全市場無符合 Qullamaggie 動能條件的股票。")
           PYTHON_SCRIPT
-
-      - name: Show fundamental refresh stats
-        if: always()
-        run: |
-          echo "=== Fundamental Cache Statistics ==="
-          if [ -f "data/fundamentals_cache/metadata.json" ]; then
-            echo "Latest updates:"
-            python3 << 'PYTHON_SCRIPT'
-            import json
-            from datetime import datetime
-
-            try:
-                with open("data/fundamentals_cache/metadata.json", "r") as f:
-                    metadata = json.load(f)
-
-                updates = [(ticker, data["last_updated"]) for ticker, data in metadata.items()]
-                updates.sort(key=lambda x: x[1], reverse=True)
-
-                print(f"Total tracked: {len(updates)} stocks")
-                print("\nLast 10 updates:")
-                for ticker, timestamp in updates[:10]:
-                    dt = datetime.fromisoformat(timestamp)
-                    formatted = dt.strftime("%Y-%m-%d %H:%M")
-                    print(f"  {ticker}: {formatted}")
-            except Exception as e:
-                print(f"Could not read metadata: {e}")
-            PYTHON_SCRIPT
-          else
-            echo "No metadata file found"
-          fi
-
-      - name: Commit updated fundamental cache
-        id: commit
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-          git add data/fundamentals_cache/
-
-          if git diff --staged --quiet; then
-            echo "No fundamental cache changes to commit"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            CHANGED_FILES=$(git diff --staged --name-only | wc -l)
-            echo "Committing $CHANGED_FILES updated fundamental files"
-            git commit -m "chore: update fundamental cache ($CHANGED_FILES stocks) - ${{ steps.date.outputs.date }}"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Push changes
-        if: steps.commit.outputs.has_changes == 'true'
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-
-      - name: Upload screening results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screening-results-${{ steps.date.outputs.date }}
-          path: |
-            data/daily_scans/
-            data/logs/
-          if-no-files-found: warn
-          retention-days: 90
-
-      - name: Cache size report
-        if: always()
-        run: |
-          echo "=== Git Repository Impact ==="
-          if [ -d "data/fundamentals_cache" ]; then
-            CACHE_SIZE=$(du -sh data/fundamentals_cache | cut -f1)
-            CACHE_FILES=$(find data/fundamentals_cache -name "*.json" | wc -l | tr -d ' ')
-
-            echo "Fundamental cache directory size: $CACHE_SIZE"
-            echo "Total files: $CACHE_FILES"
-            echo ""
-            echo "Today's commit impact:"
-            if [ "${{ steps.commit.outputs.has_changes }}" == "true" ]; then
-              git show --stat | tail -5
-            else
-              echo "  No changes committed"
-            fi
-          fi
