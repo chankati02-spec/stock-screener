@@ -14,6 +14,10 @@ This file keeps old repo-compatible column names:
 - buy_signal
 - nearest_support
 
+This file also keeps old repo-compatible functions:
+- calculate_momentum_score(price_df) -> float
+- check_is_consolidating(price_df) -> float
+
 This is a WATCHLIST generator, not an auto-buy system.
 """
 
@@ -581,13 +585,17 @@ def estimate_pivot_stop_risk(price_df: pd.DataFrame) -> Dict[str, Optional[float
 # Scoring
 # =========================================================
 
-def calculate_momentum_score(
+def calculate_momentum_score_detailed(
     price_df: pd.DataFrame,
     spy_df: Optional[pd.DataFrame] = None,
     qqq_df: Optional[pd.DataFrame] = None
 ) -> Tuple[float, Dict[str, float]]:
     """
     Qullamaggie-style momentum score.
+    New detailed version.
+    Returns:
+    - score
+    - details dict
     """
     df = _clean_price_df(price_df)
 
@@ -688,6 +696,17 @@ def calculate_momentum_score(
     return min(score, 100.0), details
 
 
+def calculate_momentum_score(price_df: pd.DataFrame) -> float:
+    """
+    Old repo-compatible wrapper.
+    Keeps old behavior:
+    - accepts only price_df
+    - returns only a float score
+    """
+    score, _ = calculate_momentum_score_detailed(price_df)
+    return score
+
+
 def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[str, float]]:
     """
     High tight consolidation score.
@@ -778,6 +797,17 @@ def calculate_consolidation_score(price_df: pd.DataFrame) -> Tuple[float, Dict[s
     }
 
     return min(score, 100.0), details
+
+
+def check_is_consolidating(price_df: pd.DataFrame) -> float:
+    """
+    Old repo-compatible wrapper.
+    Keeps old behavior:
+    - accepts only price_df
+    - returns only a float score
+    """
+    score, _ = calculate_consolidation_score(price_df)
+    return score
 
 
 # =========================================================
@@ -945,7 +975,7 @@ def screen_candidates(
             returns = calculate_returns(price_history)
             distance_52w = calculate_distance_from_52w_high(price_history)
 
-            momentum_score, momentum_details = calculate_momentum_score(
+            momentum_score, momentum_details = calculate_momentum_score_detailed(
                 price_history,
                 spy_df=spy_history,
                 qqq_df=qqq_history
@@ -1051,23 +1081,17 @@ def screen_candidates(
 
                 "current_price": round(current_price, 2),
 
-                # -------------------------------------------------
                 # Old repo-compatible names
-                # -------------------------------------------------
                 "value_score": round(momentum_score, 2),
                 "support_score": round(consolidation_score, 2),
                 "buy_signal": round(buy_signal, 2),
                 "nearest_support": round(sma_10, 2) if sma_10 is not None else None,
 
-                # -------------------------------------------------
                 # New clearer names
-                # -------------------------------------------------
                 "momentum_score": round(momentum_score, 2),
                 "consolidation_score": round(consolidation_score, 2),
 
-                # -------------------------------------------------
                 # Qullamaggie metrics
-                # -------------------------------------------------
                 "adr_20": round(adr_20, 2),
                 "avg_dollar_volume_m": round(avg_dollar_volume / 1_000_000, 2),
 
