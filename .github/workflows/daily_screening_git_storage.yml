@@ -100,6 +100,12 @@ jobs:
               return ticker
 
 
+          def flatten_yfinance_df(df):
+              if isinstance(df.columns, pd.MultiIndex):
+                  df.columns = df.columns.get_level_values(0)
+              return df
+
+
           def safe_pct_change(current, previous):
               if previous is None or previous == 0 or pd.isna(previous):
                   return 0.0
@@ -277,7 +283,6 @@ jobs:
 
               score = 0.0
 
-              # Trend score: max 25
               if current_price > sma_10:
                   score += 5
               if current_price > sma_20:
@@ -287,7 +292,6 @@ jobs:
               if current_price > sma_200:
                   score += 8
 
-              # Return score: max 30
               if returns["ret_1m"] >= 20:
                   score += 10
               elif returns["ret_1m"] >= 10:
@@ -303,7 +307,6 @@ jobs:
               elif returns["ret_6m"] >= 50:
                   score += 4
 
-              # Near 52-week high: max 15
               if distance_52w <= 5:
                   score += 15
               elif distance_52w <= 10:
@@ -311,7 +314,6 @@ jobs:
               elif distance_52w <= 15:
                   score += 5
 
-              # RS score: max 20
               if rs_spy > 20:
                   score += 10
               elif rs_spy > 10:
@@ -326,7 +328,6 @@ jobs:
               elif rs_qqq > 0:
                   score += 3
 
-              # Extension score: max 10
               extension_from_10sma = ((current_price - sma_10) / sma_10) * 100.0
 
               if 0 <= extension_from_10sma <= 8:
@@ -375,7 +376,6 @@ jobs:
 
               score = 0.0
 
-              # Tightness: max 30
               if range_10_pct <= 5:
                   score += 30
               elif range_10_pct <= 8:
@@ -383,7 +383,6 @@ jobs:
               elif range_10_pct <= 12:
                   score += 12
 
-              # Prior impulse: max 20
               if impulse_50d >= 50:
                   score += 20
               elif impulse_50d >= 30:
@@ -391,7 +390,6 @@ jobs:
               elif impulse_50d >= 20:
                   score += 8
 
-              # Near 52W high: max 15
               if distance_52w <= 5:
                   score += 15
               elif distance_52w <= 10:
@@ -399,7 +397,6 @@ jobs:
               elif distance_52w <= 15:
                   score += 5
 
-              # Volume dry-up: max 20
               if dry_up_score >= 100:
                   score += 20
               elif dry_up_score >= 70:
@@ -407,7 +404,6 @@ jobs:
               elif dry_up_score >= 40:
                   score += 7
 
-              # Risk quality: max 15
               if risk_pct is not None:
                   if risk_pct <= 6:
                       score += 15
@@ -429,9 +425,8 @@ jobs:
               return min(score, 100.0), details
 
 
-          def build_reasons(metrics, hard_rejects):
+          def build_reasons(metrics):
               reason_in = []
-              reason_out = []
 
               if metrics.get("adr_20", 0) >= MIN_ADR_20:
                   reason_in.append(f"ADR {metrics['adr_20']:.1f}%")
@@ -457,16 +452,10 @@ jobs:
               if metrics.get("volume_spike", False):
                   reason_in.append("成交量突破")
 
-              for item in hard_rejects:
-                  reason_out.append(item)
-
               if not reason_in:
                   reason_in.append("技術條件一般")
 
-              if not reason_out:
-                  reason_out.append("未見硬性淘汰條件")
-
-              return "；".join(reason_in), "；".join(reason_out)
+              return "；".join(reason_in)
 
 
           # =====================================================
@@ -503,11 +492,8 @@ jobs:
           spy_df = yf.download("SPY", period="1y", progress=False, auto_adjust=False)
           qqq_df = yf.download("QQQ", period="1y", progress=False, auto_adjust=False)
 
-          if isinstance(spy_df.columns, pd.MultiIndex):
-              spy_df.columns = spy_df.columns.get_level_values(0)
-
-          if isinstance(qqq_df.columns, pd.MultiIndex):
-              qqq_df.columns = qqq_df.columns.get_level_values(0)
+          spy_df = flatten_yfinance_df(spy_df)
+          qqq_df = flatten_yfinance_df(qqq_df)
 
           spy_df = spy_df.dropna(subset=["Close"])
           qqq_df = qqq_df.dropna(subset=["Close"])
@@ -548,9 +534,7 @@ jobs:
                               continue
                           df = data[ticker].copy()
 
-                      if isinstance(df.columns, pd.MultiIndex):
-                          df.columns = df.columns.get_level_values(0)
-
+                      df = flatten_yfinance_df(df)
                       df = df.dropna(subset=["Close", "High", "Low"])
 
                       if df.empty or len(df) < 220:
@@ -566,6 +550,30 @@ jobs:
                       avg_dollar_volume = calculate_avg_dollar_volume(df, period=20)
                       returns = calculate_returns(df)
                       distance_52w = calculate_distance_from_52w_high(df)
+                      pivot, stop, risk_pct = estimate_pivot_stop_risk(df)
+
+                      # =================================================
+                      # CRITICAL HARD FILTERS
+                      # These names are not allowed into Telegram.
+                      # =================================================
+
+                      if adr_20 < MIN_ADR_20:
+                          continue
+
+                      if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
+                          continue
+
+                      if distance_52w > MAX_DISTANCE_FROM_52W_HIGH:
+                          continue
+
+                      if risk_pct is None:
+                          continue
+
+                      if risk_pct > MAX_SETUP_RISK_PCT:
+                          continue
+
+                      if returns["ret_1m"] < 10 and returns["ret_3m"] < 25:
+                          continue
 
                       momentum_score, momentum_details = calculate_momentum_score(
                           df,
@@ -574,39 +582,19 @@ jobs:
                       )
 
                       consolidation_score, consolidation_details = calculate_consolidation_score(df)
-
-                      pivot, stop, risk_pct = estimate_pivot_stop_risk(df)
                       volume_spike = detect_volume_spike(df)
 
                       sma_10 = momentum_details.get("sma_10", np.nan)
 
-                      hard_rejects = []
-
-                      if adr_20 < MIN_ADR_20:
-                          hard_rejects.append(f"ADR太低 {adr_20:.1f}%")
-
-                      if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
-                          hard_rejects.append(f"成交額不足 ${avg_dollar_volume / 1_000_000:.1f}M")
-
-                      if distance_52w > MAX_DISTANCE_FROM_52W_HIGH:
-                          hard_rejects.append(f"離52週高位太遠 {distance_52w:.1f}%")
-
-                      if returns["ret_1m"] < 10 and returns["ret_3m"] < 25:
-                          hard_rejects.append(
-                              f"動能不足 1M {returns['ret_1m']:.1f}% / 3M {returns['ret_3m']:.1f}%"
-                          )
-
-                      if risk_pct is not None and risk_pct > MAX_SETUP_RISK_PCT:
-                          hard_rejects.append(f"setup風險太闊 {risk_pct:.1f}%")
-
                       buy_signal = (momentum_score * 0.6) + (consolidation_score * 0.4)
 
-                      if volume_spike and adr_20 >= MIN_ADR_20 and consolidation_score >= 50:
+                      if volume_spike and consolidation_score >= 50:
                           buy_signal += 5
 
-                      penalty = len(hard_rejects) * 18
-                      buy_signal -= penalty
                       buy_signal = max(0.0, min(buy_signal, 100.0))
+
+                      if buy_signal < MIN_BUY_SIGNAL:
+                          continue
 
                       metrics = {
                           "adr_20": adr_20,
@@ -618,33 +606,31 @@ jobs:
                           "range_10_pct": consolidation_details.get("range_10_pct", 999.0),
                           "impulse_50d": consolidation_details.get("impulse_50d", 0.0),
                           "volume_dry_up_score": consolidation_details.get("volume_dry_up_score", 0.0),
-                          "risk_pct": risk_pct if risk_pct is not None else 999.0,
+                          "risk_pct": risk_pct,
                           "volume_spike": volume_spike,
                       }
 
-                      reason_in, reason_out = build_reasons(metrics, hard_rejects)
+                      reason_in = build_reasons(metrics)
 
-                      if buy_signal >= MIN_BUY_SIGNAL:
-                          results.append({
-                              "ticker": ticker,
-                              "current_price": round(current_price, 2),
-                              "buy_signal": round(buy_signal, 2),
-                              "momentum_score": round(momentum_score, 2),
-                              "consolidation_score": round(consolidation_score, 2),
-                              "adr_20": round(adr_20, 2),
-                              "avg_dollar_volume_m": round(avg_dollar_volume / 1_000_000, 2),
-                              "ret_1m": round(returns["ret_1m"], 2),
-                              "ret_3m": round(returns["ret_3m"], 2),
-                              "ret_6m": round(returns["ret_6m"], 2),
-                              "distance_52w": round(distance_52w, 2),
-                              "range_10_pct": round(consolidation_details.get("range_10_pct", 999.0), 2),
-                              "pivot": pivot,
-                              "stop": stop,
-                              "risk_pct": risk_pct,
-                              "sma_10": round(sma_10, 2) if not pd.isna(sma_10) else None,
-                              "reason_in": reason_in,
-                              "reason_out": reason_out,
-                          })
+                      results.append({
+                          "ticker": ticker,
+                          "current_price": round(current_price, 2),
+                          "buy_signal": round(buy_signal, 2),
+                          "momentum_score": round(momentum_score, 2),
+                          "consolidation_score": round(consolidation_score, 2),
+                          "adr_20": round(adr_20, 2),
+                          "avg_dollar_volume_m": round(avg_dollar_volume / 1_000_000, 2),
+                          "ret_1m": round(returns["ret_1m"], 2),
+                          "ret_3m": round(returns["ret_3m"], 2),
+                          "ret_6m": round(returns["ret_6m"], 2),
+                          "distance_52w": round(distance_52w, 2),
+                          "range_10_pct": round(consolidation_details.get("range_10_pct", 999.0), 2),
+                          "pivot": pivot,
+                          "stop": stop,
+                          "risk_pct": risk_pct,
+                          "sma_10": round(sma_10, 2) if not pd.isna(sma_10) else None,
+                          "reason_in": reason_in,
+                      })
 
                   except Exception as e:
                       print(f"{ticker} 處理失敗: {e}")
@@ -667,17 +653,17 @@ jobs:
 
               top_picks = df_res.head(15)
 
-              msg = "🚀 【Qullamaggie 強勢股火箭監測｜新版】 🚀\n\n"
+              msg = "🚀 【Qullamaggie 強勢股火箭監測｜Hard Filter版】 🚀\n\n"
               msg += f"日期：{datetime.utcnow().strftime('%Y-%m-%d UTC')}\n"
-              msg += f"入選數量：{len(df_res)}\n\n"
+              msg += f"入選數量：{len(df_res)}\n"
+              msg += "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%\n\n"
 
               for idx, row in top_picks.iterrows():
                   msg += f"#{idx + 1} 股票: {row['ticker']} (${row['current_price']})\n"
                   msg += f"   📈 總評分: {row['buy_signal']:.1f} | 動能: {row['momentum_score']:.1f} | 整理: {row['consolidation_score']:.1f}\n"
                   msg += f"   ⚡ ADR: {row['adr_20']:.1f}% | 3M: {row['ret_3m']:.1f}% | 距52W高: {row['distance_52w']:.1f}%\n"
                   msg += f"   🎯 Pivot: {row['pivot']} | Stop: {row['stop']} | Risk: {row['risk_pct']}%\n"
-                  msg += f"   ✅ 原因: {row['reason_in']}\n"
-                  msg += f"   ⚠️ 風險: {row['reason_out']}\n\n"
+                  msg += f"   ✅ 原因: {row['reason_in']}\n\n"
 
               if token and chat_id:
                   url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -692,7 +678,10 @@ jobs:
                   print(msg)
 
           else:
-              msg = "今日全市場無符合新版 Qullamaggie 動能條件的股票。"
+              msg = (
+                  "今日全市場無符合 Hard Filter Qullamaggie 條件的股票。\n\n"
+                  "規則：ADR≥4%、Risk≤12%、成交額≥$20M、距52W高位≤25%、Buy Signal≥50"
+              )
 
               if token and chat_id:
                   url = f"https://api.telegram.org/bot{token}/sendMessage"
