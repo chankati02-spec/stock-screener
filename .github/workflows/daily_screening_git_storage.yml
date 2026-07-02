@@ -1,19 +1,17 @@
-name: Daily Stock Screening (Git-Based Storage)
+name: Daily Stock Screening (Intraday EP + EOD Setup)
 
 on:
   schedule:
-    # 這裡設定了多個定時器 (香港時間)：
-    # 21:45跑一次、22:15跑一次、22:45跑一次、23:15跑一次、23:45跑一次
-    - cron: '45 13 * * 1-5'  # UTC 13:45 = 香港 21:45
-    - cron: '15 14 * * 1-5'  # UTC 14:15 = 香港 22:15
-    - cron: '45 14 * * 1-5'  # UTC 14:45 = 香港 22:45
-    - cron: '15 15 * * 1-5'  # UTC 15:15 = 香港 23:15
-    - cron: '45 15 * * 1-5'  # UTC 15:45 = 香港 23:45
-    
-    # 凌晨 05:05 收市後的總結依然保留
-    - cron: '5 21 * * 1-5'
+    # 盤中 EP / BO 掃描：香港時間 21:45、22:15、22:45、23:15、23:45
+    # 美股夏令時間適用；冬令時間要整體延後 1 小時
+    - cron: '45 13 * * 1-5'
+    - cron: '15 14 * * 1-5'
+    - cron: '45 14 * * 1-5'
+    - cron: '15 15 * * 1-5'
+    - cron: '45 15 * * 1-5'
 
-    # Backup：香港時間 06:12
+    # 盤後 setup 掃描：香港時間 05:37、06:12
+    - cron: '37 21 * * 1-5'
     - cron: '12 22 * * 1-5'
 
   workflow_dispatch:
@@ -34,12 +32,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Get current date
-        id: date
-        run: |
-          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-          echo "time=$(date +'%H:%M:%S')" >> $GITHUB_OUTPUT
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -50,7 +42,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance pandas numpy pyyaml requests
 
-      - name: Run Direct Qullamaggie Screener
+      - name: Run Intraday EP / EOD Setup Screener
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -58,212 +50,1077 @@ jobs:
           python3 << 'PYTHON_SCRIPT'
           import os
           import yaml
+          import requests
           import yfinance as yf
           import pandas as pd
           import numpy as np
-          import requests
-          from datetime import datetime
+
+          from datetime import datetime, timedelta
 
           # =====================================================
-          # 自動識別市場時段 (香港時間)
+          # Mode detection
           # =====================================================
-          current_hour_hk = (datetime.utcnow().hour + 8) % 24
-          
-          # 如果在香港時間晚上 21:00 至 24:00 之間運行，自動切換為【盤中 EP 火箭模式】
-          IS_INTRADAY_MODE = 21 <= current_hour_hk <= 23
-          
+
+          now_utc = datetime.utcnow()
+          hk_now = now_utc + timedelta(hours=8)
+          hk_hour = hk_now.hour
+
+          # 香港 21:00–23:59 = 美股早盤 intraday 掃描
+          IS_INTRADAY_MODE = 21 <= hk_hour <= 23
+
+          MODE_NAME = "盤中 EP / BO 模式" if IS_INTRADAY_MODE else "盤後 Setup 模式"
+
+          # 美股夏令時間 EDT：UTC 13:30 開市，UTC 20:00 收市
+          # 冬令時間要改成 UTC 14:30 / 21:00，cron 亦要延後 1 小時
+          MARKET_OPEN_UTC_HOUR = 13
+          MARKET_OPEN_UTC_MINUTE = 30
+          MARKET_SESSION_MINUTES = 390
+
+          # =====================================================
+          # Config
+          # =====================================================
+
           MIN_PRICE = 5.0
           MIN_AVG_DOLLAR_VOLUME = 20_000_000
-          MAX_SETUP_RISK_PCT = 12.0
-          MAX_STALE_DAYS = 3 if not IS_INTRADAY_MODE else 999  # 盤中放行檢查
+          MAX_STALE_DAYS = 3
 
-          # Setup 篩選閾值
+          # Intraday EP / BO
+          INTRADAY_MIN_TURNOVER = 20_000_000
+          EP_MIN_DAY_CHANGE = 7.5
+          EP_MIN_ADJ_RVOL = 3.0
+          BO_MIN_DAY_CHANGE = 3.0
+          BO_MIN_ADJ_RVOL = 2.0
+
+          # EOD setup common
+          MAX_SETUP_RISK_PCT = 12.0
+
+          # High Tight Leader
           HIGH_TIGHT_MAX_52W_DISTANCE = 25.0
           HIGH_TIGHT_MIN_ADR = 4.0
           HIGH_TIGHT_MIN_3M_RETURN = 25.0
-          HIGH_TIGHT_MIN_BUY_SIGNAL = 50.0
+          HIGH_TIGHT_MIN_SCORE = 50.0
 
+          # Second Launch / Repair
           REPAIR_MAX_52W_DISTANCE = 60.0
           REPAIR_MIN_ADR = 3.5
           REPAIR_MIN_1M_RETURN = 8.0
           REPAIR_MIN_3M_RETURN = 20.0
-          REPAIR_MIN_BUY_SIGNAL = 45.0
+          REPAIR_MIN_SCORE = 45.0
+
+          # Base Breakout Watch
+          BASE_MAX_52W_DISTANCE = 60.0
+          BASE_MIN_ADR = 2.5
+          BASE_MAX_RANGE_10 = 12.0
+          BASE_MIN_SCORE = 40.0
 
           INVALID_TICKERS = {
               "INFO", "ATVI", "ALXN", "CELG", "CTXS", "MXIM", "NUAN",
               "ABC", "BLL", "COG", "DISCA", "DISCK", "DRE", "FISV",
-              "KSU", "MYL", "NBL", "PEAK", "FB", "NDX", "ARKG",
+              "KSU", "MYL", "NBL", "PEAK", "FB",
+              "NDX", "ARKG",
               "INFQ", "SOLS", "IMSR", "SPCX", "EIP", "ILLM"
           }
 
+          WATCH_DEBUG_TICKERS = {"AXP", "BRKR", "GEV", "WING"}
+
           # =====================================================
-          # Helper functions
+          # Helpers
           # =====================================================
+
+          def debug_skip(ticker, reason):
+              if ticker in WATCH_DEBUG_TICKERS:
+                  print(f"DEBUG {ticker} skipped: {reason}")
+
+
           def clean_ticker(ticker):
-              if ticker is None: return None
+              if ticker is None:
+                  return None
+
               ticker = str(ticker).upper().strip()
-              if not ticker: return None
+
+              if not ticker:
+                  return None
+
               ticker = ticker.split("#")[0].strip()
               ticker = ticker.replace(".", "-")
-              if ticker in INVALID_TICKERS: return None
-              if not ticker.replace("-", "").isalnum(): return None
+
+              if not ticker:
+                  return None
+
+              if ticker in INVALID_TICKERS:
+                  return None
+
+              if not ticker.replace("-", "").isalnum():
+                  return None
+
               return ticker
 
+
           def flatten_yfinance_df(df):
+              if df is None or df.empty:
+                  return pd.DataFrame()
+
               if isinstance(df.columns, pd.MultiIndex):
                   df.columns = df.columns.get_level_values(0)
+
               return df
 
+
+          def extract_ticker_df(data, ticker, batch_size):
+              if data is None or data.empty:
+                  return pd.DataFrame()
+
+              try:
+                  if batch_size == 1:
+                      return flatten_yfinance_df(data.copy())
+
+                  if isinstance(data.columns, pd.MultiIndex):
+                      if ticker not in data.columns.levels[0]:
+                          return pd.DataFrame()
+
+                      return flatten_yfinance_df(data[ticker].copy())
+
+                  return pd.DataFrame()
+
+              except Exception:
+                  return pd.DataFrame()
+
+
           def safe_pct_change(current, previous):
-              if previous is None or previous == 0 or pd.isna(previous): return 0.0
+              if previous is None:
+                  return 0.0
+
+              if pd.isna(previous) or previous == 0:
+                  return 0.0
+
               return ((current - previous) / previous) * 100.0
 
-          def is_stale_price_data(df, max_stale_days=MAX_STALE_DAYS):
-              if IS_INTRADAY_MODE: 
-                  return False, datetime.utcnow().strftime("%Y-%m-%d"), 0
-              if df is None or df.empty: return True, None, None
+
+          def send_telegram_message(token, chat_id, text, max_len=3900):
+              if not token or not chat_id:
+                  print("Missing TELEGRAM_TOKEN or TELEGRAM_CHAT_ID")
+                  print(text)
+                  return False
+
+              url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+              chunks = []
+              current = ""
+
+              for block in text.split("\n\n"):
+                  if len(current) + len(block) + 2 <= max_len:
+                      current += block + "\n\n"
+                  else:
+                      if current:
+                          chunks.append(current)
+                      current = block + "\n\n"
+
+              if current:
+                  chunks.append(current)
+
+              ok = True
+
+              for idx, chunk in enumerate(chunks):
+                  response = requests.post(
+                      url,
+                      data={"chat_id": chat_id, "text": chunk},
+                      timeout=20
+                  )
+
+                  if response.status_code != 200:
+                      ok = False
+                      print(f"Telegram chunk {idx + 1}/{len(chunks)} failed: {response.status_code} {response.text}")
+                  else:
+                      print(f"Telegram chunk {idx + 1}/{len(chunks)} sent")
+
+              return ok
+
+
+          def is_stale_daily_data(df, max_stale_days=MAX_STALE_DAYS):
+              if df is None or df.empty:
+                  return True, None, None
+
               clean_df = df.dropna(subset=["Close"])
-              if clean_df.empty: return True, None, None
+
+              if clean_df.empty:
+                  return True, None, None
+
               last_date = pd.Timestamp(clean_df.index[-1])
-              if last_date.tzinfo is not None: last_date = last_date.tz_convert(None)
-              age_days = (datetime.utcnow().date() - last_date.date()).days
-              return age_days > max_stale_days, last_date.strftime("%Y-%m-%d"), age_days
+
+              if last_date.tzinfo is not None:
+                  last_date = last_date.tz_convert(None)
+
+              last_date_only = last_date.date()
+              today_utc = datetime.utcnow().date()
+              age_days = (today_utc - last_date_only).days
+
+              return age_days > max_stale_days, last_date_only.strftime("%Y-%m-%d"), age_days
+
+
+          def get_completed_daily_df(df):
+              """
+              In intraday mode, Yahoo daily data may include today's partial daily bar.
+              Remove today's bar so prev_close / prev_high are from completed session.
+              """
+              if df is None or df.empty:
+                  return pd.DataFrame()
+
+              df = df.dropna(subset=["Close", "High", "Low"]).copy()
+
+              if df.empty:
+                  return df
+
+              today_utc = datetime.utcnow().date()
+              last_date = pd.Timestamp(df.index[-1]).date()
+
+              if last_date >= today_utc and len(df) >= 2:
+                  df = df.iloc[:-1]
+
+              return df
+
 
           def calculate_adr(df, period=20):
-              if df is None or df.empty or len(df) < period: return 0.0
+              if df is None or df.empty or len(df) < period:
+                  return 0.0
+
               recent = df.iloc[-period:]
-              adr = (((recent["High"] - recent["Low"]) / recent["Close"]) * 100).mean()
+              adr_series = ((recent["High"] - recent["Low"]) / recent["Close"]) * 100
+              adr = adr_series.mean()
+
               return float(adr) if not pd.isna(adr) else 0.0
 
+
           def calculate_avg_dollar_volume(df, period=20):
-              if df is None or df.empty or len(df) < period: return 0.0
+              if df is None or df.empty or len(df) < period:
+                  return 0.0
+
+              if "Volume" not in df.columns:
+                  return 0.0
+
               recent = df.iloc[-period:]
-              val = (recent["Close"] * recent["Volume"]).mean()
-              return float(val) if not pd.isna(val) else 0.0
+
+              if recent["Volume"].isna().all():
+                  return 0.0
+
+              value = (recent["Close"] * recent["Volume"]).mean()
+
+              return float(value) if not pd.isna(value) else 0.0
+
 
           def calculate_returns(df):
               close = df["Close"]
               current = float(close.iloc[-1])
+
+              def get_return(days):
+                  if len(close) <= days:
+                      return 0.0
+
+                  previous = float(close.iloc[-days])
+                  return safe_pct_change(current, previous)
+
               return {
-                  "ret_1m": safe_pct_change(current, float(close.iloc[-21])) if len(close) > 21 else 0.0,
-                  "ret_3m": safe_pct_change(current, float(close.iloc[-63])) if len(close) > 63 else 0.0,
-                  "ret_6m": safe_pct_change(current, float(close.iloc[-126])) if len(close) > 126 else 0.0,
+                  "ret_1m": get_return(21),
+                  "ret_3m": get_return(63),
+                  "ret_6m": get_return(126),
               }
 
+
           def calculate_distance_from_52w_high(df):
-              if df is None or df.empty or len(df) < 100: return 999.0
+              if df is None or df.empty or len(df) < 100:
+                  return 999.0
+
               recent = df.iloc[-252:] if len(df) >= 252 else df
               current = float(df["Close"].iloc[-1])
               high_52w = float(recent["High"].max())
-              return ((high_52w - current) / high_52w) * 100.0 if high_52w > 0 else 999.0
+
+              if high_52w <= 0:
+                  return 999.0
+
+              return ((high_52w - current) / high_52w) * 100.0
+
 
           def calculate_relative_strength(stock_df, benchmark_df, period=63):
-              if stock_df.empty or benchmark_df.empty or len(stock_df) <= period or len(benchmark_df) <= period: return 0.0
-              return safe_pct_change(float(stock_df["Close"].iloc[-1]), float(stock_df["Close"].iloc[-period])) - \
-                     safe_pct_change(float(benchmark_df["Close"].iloc[-1]), float(benchmark_df["Close"].iloc[-period]))
+              if stock_df is None or benchmark_df is None:
+                  return 0.0
+
+              if stock_df.empty or benchmark_df.empty:
+                  return 0.0
+
+              if len(stock_df) <= period or len(benchmark_df) <= period:
+                  return 0.0
+
+              stock_return = safe_pct_change(
+                  float(stock_df["Close"].iloc[-1]),
+                  float(stock_df["Close"].iloc[-period])
+              )
+
+              bench_return = safe_pct_change(
+                  float(benchmark_df["Close"].iloc[-1]),
+                  float(benchmark_df["Close"].iloc[-period])
+              )
+
+              return stock_return - bench_return
+
+
+          def calculate_volume_dry_up(df):
+              if df is None or df.empty or len(df) < 30:
+                  return 0.0
+
+              if "Volume" not in df.columns:
+                  return 0.0
+
+              volume = df["Volume"]
+
+              if volume.isna().all():
+                  return 0.0
+
+              recent_5 = volume.iloc[-5:].mean()
+              previous_20 = volume.iloc[-25:-5].mean()
+
+              if pd.isna(recent_5) or pd.isna(previous_20) or previous_20 <= 0:
+                  return 0.0
+
+              ratio = recent_5 / previous_20
+
+              if ratio <= 0.60:
+                  return 100.0
+              elif ratio <= 0.80:
+                  return 70.0
+              elif ratio <= 1.00:
+                  return 40.0
+              else:
+                  return 0.0
+
+
+          def estimate_pivot_stop_risk(df):
+              if df is None or df.empty or len(df) < 15:
+                  return None, None, None
+
+              recent = df.iloc[-10:]
+
+              pivot = float(recent["High"].max())
+              stop = float(recent["Low"].min())
+
+              if pivot <= 0 or stop <= 0 or stop >= pivot:
+                  return round(pivot, 2), round(stop, 2), None
+
+              risk_pct = ((pivot - stop) / pivot) * 100.0
+
+              return round(pivot, 2), round(stop, 2), round(risk_pct, 2)
+
+
+          def get_sma_details(df):
+              close = df["Close"]
+
+              sma_10 = close.rolling(10).mean().iloc[-1]
+              sma_20 = close.rolling(20).mean().iloc[-1]
+              sma_50 = close.rolling(50).mean().iloc[-1]
+              sma_200 = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else np.nan
+
+              sma_50_prev = close.rolling(50).mean().iloc[-10] if len(close) >= 60 else np.nan
+
+              sma_50_turning_up = False
+
+              if not pd.isna(sma_50) and not pd.isna(sma_50_prev):
+                  sma_50_turning_up = sma_50 > sma_50_prev
+
+              return {
+                  "sma_10": float(sma_10) if not pd.isna(sma_10) else np.nan,
+                  "sma_20": float(sma_20) if not pd.isna(sma_20) else np.nan,
+                  "sma_50": float(sma_50) if not pd.isna(sma_50) else np.nan,
+                  "sma_200": float(sma_200) if not pd.isna(sma_200) else np.nan,
+                  "sma_50_turning_up": sma_50_turning_up,
+              }
+
+
+          def calculate_momentum_score(df, spy_df=None, qqq_df=None):
+              if df is None or df.empty or len(df) < 200:
+                  return 0.0, {}
+
+              current_price = float(df["Close"].iloc[-1])
+              sma = get_sma_details(df)
+              returns = calculate_returns(df)
+              distance_52w = calculate_distance_from_52w_high(df)
+
+              rs_spy = calculate_relative_strength(df, spy_df, period=63)
+              rs_qqq = calculate_relative_strength(df, qqq_df, period=63)
+
+              score = 0.0
+
+              if not pd.isna(sma["sma_10"]) and current_price > sma["sma_10"]:
+                  score += 5
+              if not pd.isna(sma["sma_20"]) and current_price > sma["sma_20"]:
+                  score += 5
+              if not pd.isna(sma["sma_50"]) and current_price > sma["sma_50"]:
+                  score += 7
+              if not pd.isna(sma["sma_200"]) and current_price > sma["sma_200"]:
+                  score += 8
+
+              if returns["ret_1m"] >= 20:
+                  score += 10
+              elif returns["ret_1m"] >= 10:
+                  score += 5
+
+              if returns["ret_3m"] >= 50:
+                  score += 12
+              elif returns["ret_3m"] >= 25:
+                  score += 7
+
+              if returns["ret_6m"] >= 100:
+                  score += 8
+              elif returns["ret_6m"] >= 50:
+                  score += 4
+
+              if distance_52w <= 5:
+                  score += 15
+              elif distance_52w <= 10:
+                  score += 10
+              elif distance_52w <= 25:
+                  score += 5
+              elif distance_52w <= 60:
+                  score += 2
+
+              if rs_spy > 20:
+                  score += 10
+              elif rs_spy > 10:
+                  score += 6
+              elif rs_spy > 0:
+                  score += 3
+
+              if rs_qqq > 20:
+                  score += 10
+              elif rs_qqq > 10:
+                  score += 6
+              elif rs_qqq > 0:
+                  score += 3
+
+              extension_from_10sma = 999.0
+
+              if not pd.isna(sma["sma_10"]) and sma["sma_10"] > 0:
+                  extension_from_10sma = ((current_price - sma["sma_10"]) / sma["sma_10"]) * 100.0
+
+                  if 0 <= extension_from_10sma <= 8:
+                      score += 10
+                  elif 8 < extension_from_10sma <= 15:
+                      score += 4
+
+              details = {
+                  **sma,
+                  "ret_1m": returns["ret_1m"],
+                  "ret_3m": returns["ret_3m"],
+                  "ret_6m": returns["ret_6m"],
+                  "distance_52w": distance_52w,
+                  "rs_spy": rs_spy,
+                  "rs_qqq": rs_qqq,
+                  "extension_from_10sma": extension_from_10sma,
+              }
+
+              return min(score, 100.0), details
+
+
+          def calculate_consolidation_score(df):
+              if df is None or df.empty or len(df) < 80:
+                  return 0.0, {}
+
+              current_price = float(df["Close"].iloc[-1])
+
+              recent_10 = df.iloc[-10:]
+              high_10 = float(recent_10["High"].max())
+              low_10 = float(recent_10["Low"].min())
+
+              if low_10 <= 0:
+                  return 0.0, {}
+
+              range_10_pct = ((high_10 - low_10) / low_10) * 100.0
+
+              price_50_days_ago = float(df["Close"].iloc[-50])
+              impulse_50d = safe_pct_change(current_price, price_50_days_ago)
+
+              distance_52w = calculate_distance_from_52w_high(df)
+              dry_up_score = calculate_volume_dry_up(df)
+              pivot, stop, risk_pct = estimate_pivot_stop_risk(df)
+
+              score = 0.0
+
+              if range_10_pct <= 5:
+                  score += 30
+              elif range_10_pct <= 8:
+                  score += 22
+              elif range_10_pct <= 12:
+                  score += 12
+
+              if impulse_50d >= 50:
+                  score += 20
+              elif impulse_50d >= 30:
+                  score += 15
+              elif impulse_50d >= 20:
+                  score += 8
+
+              if distance_52w <= 5:
+                  score += 15
+              elif distance_52w <= 10:
+                  score += 10
+              elif distance_52w <= 25:
+                  score += 5
+              elif distance_52w <= 60:
+                  score += 2
+
+              if dry_up_score >= 100:
+                  score += 20
+              elif dry_up_score >= 70:
+                  score += 14
+              elif dry_up_score >= 40:
+                  score += 7
+
+              if risk_pct is not None:
+                  if risk_pct <= 6:
+                      score += 15
+                  elif risk_pct <= 8:
+                      score += 10
+                  elif risk_pct <= 12:
+                      score += 5
+
+              details = {
+                  "range_10_pct": range_10_pct,
+                  "impulse_50d": impulse_50d,
+                  "distance_52w": distance_52w,
+                  "volume_dry_up_score": dry_up_score,
+                  "pivot": pivot,
+                  "stop": stop,
+                  "risk_pct": risk_pct,
+              }
+
+              return min(score, 100.0), details
+
+
+          def classify_eod_setup(
+              current_price,
+              adr_20,
+              avg_dollar_volume,
+              returns,
+              distance_52w,
+              risk_pct,
+              sma_details,
+              consolidation_details
+          ):
+              if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
+                  return None
+
+              if risk_pct is None or risk_pct > MAX_SETUP_RISK_PCT:
+                  return None
+
+              sma_20 = sma_details.get("sma_20", np.nan)
+              sma_50 = sma_details.get("sma_50", np.nan)
+              sma_200 = sma_details.get("sma_200", np.nan)
+              sma_50_turning_up = sma_details.get("sma_50_turning_up", False)
+
+              above_20 = not pd.isna(sma_20) and current_price > sma_20
+              above_50 = not pd.isna(sma_50) and current_price > sma_50
+              above_200 = not pd.isna(sma_200) and current_price > sma_200
+
+              range_10_pct = consolidation_details.get("range_10_pct", 999.0)
+              dry_up = consolidation_details.get("volume_dry_up_score", 0.0)
+
+              is_high_tight = (
+                  distance_52w <= HIGH_TIGHT_MAX_52W_DISTANCE
+                  and adr_20 >= HIGH_TIGHT_MIN_ADR
+                  and returns["ret_3m"] >= HIGH_TIGHT_MIN_3M_RETURN
+                  and above_50
+                  and above_200
+                  and range_10_pct <= 12
+              )
+
+              if is_high_tight:
+                  return "High Tight Leader"
+
+              is_repair = (
+                  distance_52w <= REPAIR_MAX_52W_DISTANCE
+                  and adr_20 >= REPAIR_MIN_ADR
+                  and returns["ret_1m"] >= REPAIR_MIN_1M_RETURN
+                  and returns["ret_3m"] >= REPAIR_MIN_3M_RETURN
+                  and above_50
+                  and above_200
+                  and sma_50_turning_up
+              )
+
+              if is_repair:
+                  return "Second Launch / Repair"
+
+              is_base_watch = (
+                  distance_52w <= BASE_MAX_52W_DISTANCE
+                  and adr_20 >= BASE_MIN_ADR
+                  and range_10_pct <= BASE_MAX_RANGE_10
+                  and above_20
+                  and above_50
+                  and dry_up >= 40
+              )
+
+              if is_base_watch:
+                  return "Base Breakout Watch"
+
+              return None
+
+
+          def get_market_elapsed_minutes_utc():
+              open_time = now_utc.replace(
+                  hour=MARKET_OPEN_UTC_HOUR,
+                  minute=MARKET_OPEN_UTC_MINUTE,
+                  second=0,
+                  microsecond=0
+              )
+
+              elapsed = (now_utc - open_time).total_seconds() / 60.0
+              elapsed = max(1.0, min(elapsed, MARKET_SESSION_MINUTES))
+
+              return elapsed
+
+
+          def classify_intraday_ep_bo(ticker, daily_df, intraday_df):
+              completed_daily = get_completed_daily_df(daily_df)
+
+              if completed_daily.empty or len(completed_daily) < 30:
+                  return None
+
+              if intraday_df is None or intraday_df.empty:
+                  return None
+
+              intraday_df = intraday_df.dropna(subset=["Close", "High", "Low"])
+
+              if intraday_df.empty:
+                  return None
+
+              prev_close = float(completed_daily["Close"].iloc[-1])
+              prev_high = float(completed_daily["High"].iloc[-1])
+              avg_vol_20 = float(completed_daily["Volume"].iloc[-20:].mean())
+              adr_20 = calculate_adr(completed_daily, 20)
+
+              current_price = float(intraday_df["Close"].iloc[-1])
+              current_volume = float(intraday_df["Volume"].sum())
+
+              if current_price < MIN_PRICE:
+                  return None
+
+              if avg_vol_20 <= 0:
+                  return None
+
+              day_change = safe_pct_change(current_price, prev_close)
+              raw_rvol = current_volume / avg_vol_20
+
+              elapsed_minutes = get_market_elapsed_minutes_utc()
+              expected_fraction = max(elapsed_minutes / MARKET_SESSION_MINUTES, 0.02)
+              adjusted_rvol = raw_rvol / expected_fraction
+
+              turnover = current_price * current_volume
+              breaks_prev_high = current_price > prev_high
+
+              if turnover < INTRADAY_MIN_TURNOVER:
+                  return None
+
+              is_ep = (
+                  day_change >= EP_MIN_DAY_CHANGE
+                  and adjusted_rvol >= EP_MIN_ADJ_RVOL
+                  and breaks_prev_high
+              )
+
+              is_bo = (
+                  day_change >= BO_MIN_DAY_CHANGE
+                  and adjusted_rvol >= BO_MIN_ADJ_RVOL
+                  and breaks_prev_high
+                  and adr_20 >= 3.0
+              )
+
+              if is_ep:
+                  setup_type = "Intraday EP Rocket"
+              elif is_bo:
+                  setup_type = "Intraday Breakout"
+              else:
+                  return None
+
+              score = 0.0
+              score += min(day_change * 4, 40)
+              score += min(adjusted_rvol * 10, 30)
+              score += 15 if breaks_prev_high else 0
+              score += min(adr_20 * 3, 15)
+
+              return {
+                  "ticker": ticker,
+                  "mode": "INTRADAY",
+                  "setup_type": setup_type,
+                  "price": round(current_price, 2),
+                  "prev_close": round(prev_close, 2),
+                  "prev_high": round(prev_high, 2),
+                  "day_change": round(day_change, 2),
+                  "raw_rvol": round(raw_rvol, 2),
+                  "adjusted_rvol": round(adjusted_rvol, 2),
+                  "turnover_m": round(turnover / 1_000_000, 2),
+                  "adr_20": round(adr_20, 2),
+                  "score": round(min(score, 100), 2),
+                  "data_time": str(intraday_df.index[-1]),
+              }
+
 
           # =====================================================
-          # 核心篩選器
+          # Load config
           # =====================================================
+
           with open("config.yaml", "r") as f:
               config = yaml.safe_load(f)
 
-          tickers = list(set([clean_ticker(t) for t in config.get("stock_universe", []) if clean_ticker(t)]))
-          print(f"模式：{'【盤中 EP 火箭模式】' if IS_INTRADAY_MODE else '【收市常規總結模式】'}")
-          print(f"成功載入 {len(tickers)} 隻股票，開始下載...")
+          raw_tickers = config.get("stock_universe", [])
 
-          spy_df = flatten_yfinance_df(yf.download("SPY", period="1y", progress=False))
-          qqq_df = flatten_yfinance_df(yf.download("QQQ", period="1y", progress=False))
+          tickers = []
+          seen = set()
+
+          for raw in raw_tickers:
+              ticker = clean_ticker(raw)
+
+              if not ticker:
+                  continue
+
+              if ticker in seen:
+                  continue
+
+              seen.add(ticker)
+              tickers.append(ticker)
+
+          universe_set = set(tickers)
+
+          for watch in sorted(WATCH_DEBUG_TICKERS):
+              if watch not in universe_set:
+                  print(f"DEBUG {watch}: not in stock_universe")
+
+          print(f"Mode: {MODE_NAME}")
+          print(f"HK time: {hk_now.strftime('%Y-%m-%d %H:%M')}")
+          print(f"Loaded {len(tickers)} tickers")
+
+          # =====================================================
+          # Download benchmark daily data
+          # =====================================================
+
+          print("Downloading SPY / QQQ daily benchmark...")
+
+          spy_df = yf.download(
+              "SPY",
+              period="1y",
+              interval="1d",
+              progress=False,
+              auto_adjust=False
+          )
+
+          qqq_df = yf.download(
+              "QQQ",
+              period="1y",
+              interval="1d",
+              progress=False,
+              auto_adjust=False
+          )
+
+          spy_df = flatten_yfinance_df(spy_df).dropna(subset=["Close", "High", "Low"])
+          qqq_df = flatten_yfinance_df(qqq_df).dropna(subset=["Close", "High", "Low"])
+
+          spy_daily_completed = get_completed_daily_df(spy_df)
+          qqq_daily_completed = get_completed_daily_df(qqq_df)
 
           results = []
-          batch_size = 40
+          stale_count = 0
+          skipped_count = 0
+
+          batch_size = 35 if IS_INTRADAY_MODE else 45
+
+          # =====================================================
+          # Main loop
+          # =====================================================
+
           for i in range(0, len(tickers), batch_size):
               batch = tickers[i:i + batch_size]
+              batch_str = " ".join(batch)
+
+              print(f"Processing batch {i} to {i + len(batch)}")
+
               try:
-                  data = yf.download(" ".join(batch), period="1y", group_by="ticker", progress=False, threads=True)
-              except: continue
+                  daily_data = yf.download(
+                      batch_str,
+                      period="1y",
+                      interval="1d",
+                      group_by="ticker",
+                      progress=False,
+                      auto_adjust=False,
+                      threads=True
+                  )
+              except Exception as e:
+                  print(f"Daily batch failed: {e}")
+                  continue
+
+              intraday_data = None
+
+              if IS_INTRADAY_MODE:
+                  try:
+                      intraday_data = yf.download(
+                          batch_str,
+                          period="1d",
+                          interval="5m",
+                          group_by="ticker",
+                          progress=False,
+                          auto_adjust=False,
+                          prepost=False,
+                          threads=True
+                      )
+                  except Exception as e:
+                      print(f"Intraday batch failed: {e}")
+                      intraday_data = None
 
               for ticker in batch:
                   try:
-                      df = data if len(batch) == 1 else (data[ticker].copy() if ticker in data.columns.levels[0] else None)
-                      if df is None or df.empty: continue
-                      df = flatten_yfinance_df(df).dropna(subset=["Close", "High", "Low"])
-                      if len(df) < 150: continue
+                      daily_df = extract_ticker_df(daily_data, ticker, len(batch))
+                      daily_df = daily_df.dropna(subset=["Close", "High", "Low"])
 
-                      current_price = float(df["Close"].iloc[-1])
-                      if current_price < MIN_PRICE: continue
+                      if daily_df.empty or len(daily_df) < 150:
+                          debug_skip(ticker, "daily data too short or empty")
+                          skipped_count += 1
+                          continue
 
-                      # 數據更新檢查
-                      is_stale, price_date, age_days = is_stale_price_data(df)
-                      if is_stale: continue
+                      # =================================================
+                      # Intraday EP / BO mode
+                      # =================================================
 
-                      # 核心量化計算
-                      adr_20 = calculate_adr(df)
-                      avg_dollar_vol = calculate_avg_dollar_volume(df)
-                      if avg_dollar_vol < MIN_AVG_DOLLAR_VOLUME: continue
-
-                      # 盤中與收市分流邏輯
                       if IS_INTRADAY_MODE:
-                          # 1. 盤中 EP 火箭條件
-                          prev_close = float(df["Close"].iloc[-2])
-                          prev_high = float(df["High"].iloc[-2])
-                          day_change = ((current_price - prev_close) / prev_close) * 100
-                          
-                          # 計算盤中實時 RVOL
-                          avg_vol_20 = df["Volume"].iloc[-21:-1].mean()
-                          current_vol = float(df["Volume"].iloc[-1])
-                          rvol = current_vol / avg_vol_20 if avg_vol_20 > 0 else 0
+                          intraday_df = extract_ticker_df(
+                              intraday_data,
+                              ticker,
+                              len(batch)
+                          ) if intraday_data is not None else pd.DataFrame()
 
-                          # 執行 Kati 的四大 EP 斷層硬指標 (放寬成交額至 $20M 以包容盤中剛開市的狀態)
-                          if day_change >= 7.5 and rvol >= 2.0 and current_price > prev_high and (current_price * current_vol) >= 20_000_000:
-                              results.append({
-                                  "ticker": ticker, "mode": "EP_ROCKET", "price": round(current_price, 2),
-                                  "change": round(day_change, 1), "rvol": round(rvol, 1),
-                                  "turnover": round((current_price * current_vol)/1_000_000, 1)
-                              })
+                          result = classify_intraday_ep_bo(
+                              ticker=ticker,
+                              daily_df=daily_df,
+                              intraday_df=intraday_df
+                          )
+
+                          if result is None:
+                              debug_skip(ticker, "no intraday EP / BO setup")
+                              skipped_count += 1
+                              continue
+
+                          results.append(result)
+                          continue
+
+                      # =================================================
+                      # EOD setup mode
+                      # =================================================
+
+                      daily_completed = get_completed_daily_df(daily_df)
+
+                      if daily_completed.empty or len(daily_completed) < 220:
+                          debug_skip(ticker, "completed daily data too short")
+                          skipped_count += 1
+                          continue
+
+                      is_stale, price_date, age_days = is_stale_daily_data(daily_completed)
+
+                      if is_stale:
+                          debug_skip(ticker, f"stale daily data date={price_date}, age={age_days}")
+                          stale_count += 1
+                          continue
+
+                      current_price = float(daily_completed["Close"].iloc[-1])
+
+                      if current_price < MIN_PRICE:
+                          debug_skip(ticker, f"price too low {current_price}")
+                          skipped_count += 1
+                          continue
+
+                      avg_dollar_volume = calculate_avg_dollar_volume(daily_completed, 20)
+
+                      if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
+                          debug_skip(ticker, f"avg dollar volume too low ${avg_dollar_volume / 1_000_000:.1f}M")
+                          skipped_count += 1
+                          continue
+
+                      adr_20 = calculate_adr(daily_completed, 20)
+                      returns = calculate_returns(daily_completed)
+                      distance_52w = calculate_distance_from_52w_high(daily_completed)
+
+                      momentum_score, momentum_details = calculate_momentum_score(
+                          daily_completed,
+                          spy_df=spy_daily_completed,
+                          qqq_df=qqq_daily_completed
+                      )
+
+                      consolidation_score, consolidation_details = calculate_consolidation_score(daily_completed)
+
+                      pivot = consolidation_details.get("pivot")
+                      stop = consolidation_details.get("stop")
+                      risk_pct = consolidation_details.get("risk_pct")
+
+                      setup_type = classify_eod_setup(
+                          current_price=current_price,
+                          adr_20=adr_20,
+                          avg_dollar_volume=avg_dollar_volume,
+                          returns=returns,
+                          distance_52w=distance_52w,
+                          risk_pct=risk_pct,
+                          sma_details=momentum_details,
+                          consolidation_details=consolidation_details
+                      )
+
+                      if setup_type is None:
+                          debug_skip(
+                              ticker,
+                              f"no EOD setup | ADR={adr_20:.2f}% | "
+                              f"1M={returns['ret_1m']:.2f}% | "
+                              f"3M={returns['ret_3m']:.2f}% | "
+                              f"Dist52W={distance_52w:.2f}% | "
+                              f"Risk={risk_pct} | "
+                              f"Range10={consolidation_details.get('range_10_pct', 999):.2f}% | "
+                              f"SMA50={momentum_details.get('sma_50')} | "
+                              f"SMA200={momentum_details.get('sma_200')} | "
+                              f"SMA50Up={momentum_details.get('sma_50_turning_up')}"
+                          )
+                          skipped_count += 1
+                          continue
+
+                      buy_signal = (momentum_score * 0.6) + (consolidation_score * 0.4)
+
+                      if setup_type == "Second Launch / Repair":
+                          buy_signal += 3
+
+                      if setup_type == "Base Breakout Watch":
+                          buy_signal += 5
+
+                      buy_signal = max(0.0, min(buy_signal, 100.0))
+
+                      if setup_type == "High Tight Leader":
+                          required_score = HIGH_TIGHT_MIN_SCORE
+                      elif setup_type == "Second Launch / Repair":
+                          required_score = REPAIR_MIN_SCORE
                       else:
-                          # 2. 收市常規總結模式
-                          recent_10 = df.iloc[-10:]
-                          h10, l10 = float(recent_10["High"].max()), float(recent_10["Low"].min())
-                          range_10 = ((h10 - l10) / l10) * 100
-                          risk_pct = ((h10 - l10) / h10) * 100
-                          if risk_pct > MAX_SETUP_RISK_PCT: continue
+                          required_score = BASE_MIN_SCORE
 
-                          # 簡單動能與趨勢打分
-                          returns = calculate_returns(df)
-                          dist_52w = calculate_distance_from_52w_high(df)
-                          if dist_52w <= 25 and range_10 <= 12:
-                              results.append({
-                                  "ticker": ticker, "mode": "EOD_SUMMARY", "price": round(current_price, 2),
-                                  "range_10": round(range_10, 1), "risk": round(risk_pct, 1), "dist_52w": round(dist_52w, 1)
-                              })
-                  except: continue
+                      if buy_signal < required_score:
+                          debug_skip(ticker, f"score too low {buy_signal:.1f} < {required_score}")
+                          skipped_count += 1
+                          continue
+
+                      reason_bits = [
+                          setup_type,
+                          f"ADR {adr_20:.1f}%",
+                          f"1M {returns['ret_1m']:.1f}%",
+                          f"3M {returns['ret_3m']:.1f}%",
+                          f"距52W高 {distance_52w:.1f}%",
+                          f"10日range {consolidation_details.get('range_10_pct', 999):.1f}%",
+                          f"risk {risk_pct:.1f}%",
+                      ]
+
+                      if momentum_details.get("sma_50_turning_up", False):
+                          reason_bits.append("50MA轉上")
+
+                      if consolidation_details.get("volume_dry_up_score", 0) >= 40:
+                          reason_bits.append("縮量整理")
+
+                      results.append({
+                          "ticker": ticker,
+                          "mode": "EOD",
+                          "setup_type": setup_type,
+                          "price": round(current_price, 2),
+                          "price_date": price_date,
+                          "age_days": age_days,
+                          "buy_signal": round(buy_signal, 2),
+                          "momentum_score": round(momentum_score, 2),
+                          "consolidation_score": round(consolidation_score, 2),
+                          "adr_20": round(adr_20, 2),
+                          "avg_dollar_volume_m": round(avg_dollar_volume / 1_000_000, 2),
+                          "ret_1m": round(returns["ret_1m"], 2),
+                          "ret_3m": round(returns["ret_3m"], 2),
+                          "ret_6m": round(returns["ret_6m"], 2),
+                          "distance_52w": round(distance_52w, 2),
+                          "range_10_pct": round(consolidation_details.get("range_10_pct", 999.0), 2),
+                          "pivot": pivot,
+                          "stop": stop,
+                          "risk_pct": risk_pct,
+                          "sma_50": round(momentum_details.get("sma_50", np.nan), 2) if not pd.isna(momentum_details.get("sma_50", np.nan)) else None,
+                          "sma_200": round(momentum_details.get("sma_200", np.nan), 2) if not pd.isna(momentum_details.get("sma_200", np.nan)) else None,
+                          "reason": "；".join(reason_bits),
+                      })
+
+                  except Exception as e:
+                      print(f"{ticker} failed: {e}")
+                      skipped_count += 1
+                      continue
 
           # =====================================================
-          # 模式連動發送 Telegram
+          # Telegram output
           # =====================================================
-          token, chat_id = os.getenv("TELEGRAM_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
+
+          token = os.getenv("TELEGRAM_TOKEN")
+          chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
           if not results:
-              if not IS_INTRADAY_MODE:
-                  requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": chat_id, "text": "🌙【收市總結】今日無完全符合形態之強勢股。"})
-              print("無符合條件股票")
+              msg = f"📭【{MODE_NAME}】今日暫時無符合條件股票。\n\n"
+              msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+              msg += f"Stale skipped：{stale_count}\n"
+              msg += f"Other skipped：{skipped_count}\n"
+
+              send_telegram_message(token, chat_id, msg)
+              print(msg)
+
           else:
               df_res = pd.DataFrame(results)
+
               if IS_INTRADAY_MODE:
-                  msg = "🔥【Kati 核心 EP 盤中火箭預警】🔥\n\n"
-                  for _, row in df_res.iterrows():
-                      msg += f"🚀 股票: {row['ticker']}\n"
-                      msg += f"   現價: ${row['price']} | 實時漲幅: +{row['change']}%\n"
-                      msg += f"   相對成交量 (RVOL): {row['rvol']} 倍\n"
-                      msg += f"   當前成交額: ${row['turnover']}M (大資金集結)\n"
-                      msg += f"   💡 動作: 衝去睇下有無【財報/法案】催化劑！\n\n"
+                  df_res = df_res.sort_values(
+                      by=["score", "adjusted_rvol", "day_change", "turnover_m"],
+                      ascending=[False, False, False, False]
+                  ).reset_index(drop=True)
+
+                  top = df_res.head(12)
+
+                  msg = "🔥【Kati 盤中 EP / BO 火箭監測】🔥\n\n"
+                  msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+                  msg += f"入選數量：{len(df_res)}\n"
+                  msg += "條件：5m data、突破昨日高位、強即時升幅、time-adjusted RVOL、成交額≥$20M\n\n"
+
+                  for idx, row in top.iterrows():
+                      msg += f"#{idx + 1} {row['ticker']}｜{row['setup_type']}\n"
+                      msg += f"   現價: ${row['price']} | 漲幅: +{row['day_change']:.1f}% | 分數: {row['score']:.1f}\n"
+                      msg += f"   前高: ${row['prev_high']} | 前收: ${row['prev_close']}\n"
+                      msg += f"   Raw RVOL: {row['raw_rvol']:.2f} | Adj RVOL: {row['adjusted_rvol']:.2f}\n"
+                      msg += f"   Turnover: ${row['turnover_m']:.1f}M | ADR: {row['adr_20']:.1f}%\n"
+                      msg += f"   Data time: {row['data_time']}\n"
+                      msg += "   動作：即刻睇圖 + 查 catalyst，不自動追入。\n\n"
+
               else:
-                  msg = "🌙【Qullamaggie 收市強勢股 Top 15 總結】🌙\n\n"
-                  for idx, row in df_res.head(15).iterrows():
-                      msg += f"#{idx+1} 股票: {row['ticker']} | 價: ${row['price']}\n"
-                      msg += f"   10日橫盤波幅: {row['range_10']}% | 預估止損風險: {row['risk']}%\n"
-                      msg += f"   距離52週高位: {row['dist_52w']}%\n\n"
-              
-              requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": chat_id, "text": msg})
-              print("✓ Telegram 訊號推送成功！")
+                  setup_order = {
+                      "High Tight Leader": 1,
+                      "Second Launch / Repair": 2,
+                      "Base Breakout Watch": 3,
+                  }
+
+                  df_res["setup_rank"] = df_res["setup_type"].map(setup_order).fillna(9)
+
+                  df_res = df_res.sort_values(
+                      by=["setup_rank", "buy_signal", "adr_20", "ret_3m", "distance_52w"],
+                      ascending=[True, False, False, False, True]
+                  ).reset_index(drop=True)
+
+                  top = df_res.head(15)
+
+                  msg = "🌙【Kati 盤後 Setup 監測｜Leader + Repair + Base】🌙\n\n"
+                  msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+                  msg += f"入選數量：{len(df_res)}\n"
+                  msg += f"Stale skipped：{stale_count}\n"
+                  msg += f"Other skipped：{skipped_count}\n"
+                  msg += "類型：High Tight / Second Launch Repair / Base Breakout Watch\n\n"
+
+                  for idx, row in top.iterrows():
+                      msg += f"#{idx + 1} {row['ticker']}｜{row['setup_type']}\n"
+                      msg += f"   Close: ${row['price']} | Date: {row['price_date']} | Age: {row['age_days']}d\n"
+                      msg += f"   分數: {row['buy_signal']:.1f} | 動能: {row['momentum_score']:.1f} | 整理: {row['consolidation_score']:.1f}\n"
+                      msg += f"   ADR: {row['adr_20']:.1f}% | 1M: {row['ret_1m']:.1f}% | 3M: {row['ret_3m']:.1f}% | 距52W高: {row['distance_52w']:.1f}%\n"
+                      msg += f"   10日range: {row['range_10_pct']:.1f}% | Pivot: {row['pivot']} | Stop: {row['stop']} | Risk: {row['risk_pct']}%\n"
+                      msg += f"   50MA: {row['sma_50']} | 200MA: {row['sma_200']}\n"
+                      msg += f"   原因: {row['reason']}\n\n"
+
+              send_telegram_message(token, chat_id, msg)
+              print("✓ Telegram message sent")
+
           PYTHON_SCRIPT
