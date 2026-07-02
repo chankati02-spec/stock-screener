@@ -4,7 +4,6 @@ on:
   schedule:
     # 這裡設定了多個定時器 (香港時間)：
     # 21:45跑一次、22:15跑一次、22:45跑一次、23:15跑一次、23:45跑一次
-    # 完美覆蓋美股開市前半段最瘋狂的黃金兩小時！
     - cron: '45 13 * * 1-5'  # UTC 13:45 = 香港 21:45
     - cron: '15 14 * * 1-5'  # UTC 14:15 = 香港 22:15
     - cron: '45 14 * * 1-5'  # UTC 14:45 = 香港 22:45
@@ -14,7 +13,7 @@ on:
     # 凌晨 05:05 收市後的總結依然保留
     - cron: '5 21 * * 1-5'
 
-    # Backup：香港時間 06:12，防止 GitHub schedule skip/drop
+    # Backup：香港時間 06:12
     - cron: '12 22 * * 1-5'
 
   workflow_dispatch:
@@ -57,7 +56,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python3 << 'PYTHON_SCRIPT'
-        import os
+          import os
           import yaml
           import yfinance as yf
           import pandas as pd
