@@ -1,5 +1,5 @@
 stock_universe:
-  # Momentum / Qullamaggie-style names
+  # === 2026 Dynamic Leaders & Qullamaggie-style High Momentum ===
   - CRWD
   - NBIS
   - SNOW
@@ -18,7 +18,6 @@ stock_universe:
   - NOK
   - VST
   - BEAM
-  - MU
   - CLSK
   - BTDR
   - FLNC
@@ -42,11 +41,53 @@ stock_universe:
   - TPB
   - PM
   - PLTR
-  - CRCL
+  - CRCL  # USDC母公司，2026頂級金融科技與政策催化劑股
   - V
   - APLD
+  - WING  # 強勢餐飲動能股
+  - BRKR  # 高成長醫療儀器股
+  - HROW  # 高 ADR 醫藥黑馬
+  - MU    # 記憶體大牛股，HBM 核心玩家
+  - SNDK  # AI 數據中心快閃記憶體暴升神股 (WDC分拆)
+  - VKTX  # 減肥藥高爆發黑馬
+  - ALT   # 高 ADR 減肥藥概念
+  - MDGL  # 脂肪肝醫藥龍頭
+  - SRPT  # 基因療法明星股
+  - PODD  # 糖尿病醫療設備
+  - TNDM  # 高波動醫療科技
+  - CELH  # 能量飲料超級動能股
+  - SMCI  # 高動能伺服器巨頭
+  - IBRX  # 2026 癌症免疫療法爆發型龍頭
+  - RSI   # 線上博彩與遊戲動能股
+  - ANF   # 服飾零售大牛股
+  - PHM   # 頂級房地產商
+  - KRE   # 區域銀行 ETF (抓板塊集體 EP)
+  - MSOS  # 大麻板塊 ETF (抓法案催化劑)
+  - TLRY  # 流動性最強的大麻個股
+  - WYNN  # 永利度假村，博彩板塊核心
+  - DKNG  # DraftKings，線上博彩超級動能龍頭 (Qullamaggie最愛)
+  - PENN  # 高波動線上博彩股
+  - CHH   # 精選酒店連鎖巨頭
+  - WH    # 溫德姆酒店集團
 
-  # QQQ / Nasdaq style core
+  # === 擴充：軍工與綠能 (高品質流動性) ===
+  - FSLR
+  - RUN
+  - SEDG
+  - JKS
+  - NEXT
+  - LHX
+  - TDG
+  - SPR
+  - HII
+
+  # === 擴充：加密與 Fintech 動能股 ===
+  - COIN
+  - MSTR
+  - MARA
+  - BITO
+
+  # === QQQ / Nasdaq Style Core ===
   - AAPL
   - MSFT
   - GOOGL
@@ -84,7 +125,7 @@ stock_universe:
   - MDB
   - ZS
 
-  # SPY / broad market core
+  # === SPY / Broad Market Core ===
   - JPM
   - BAC
   - GS
@@ -129,7 +170,7 @@ stock_universe:
   - UPS
   - FDX
 
-  # Additional liquid / broad names
+  # === Additional Liquid / Broad Names ===
   - A
   - AAL
   - ACN
