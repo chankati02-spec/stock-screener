@@ -94,23 +94,24 @@ jobs:
           # EOD setup common
           MAX_SETUP_RISK_PCT = 12.0
 
-          # High Tight Leader
+          # High Tight Leader：強勢股可以接受高 ADR
           HIGH_TIGHT_MAX_52W_DISTANCE = 25.0
           HIGH_TIGHT_MIN_ADR = 4.0
           HIGH_TIGHT_MIN_3M_RETURN = 25.0
           HIGH_TIGHT_MIN_SCORE = 50.0
 
-          # Second Launch / Repair
+          # Second Launch / Repair：修復股仍需要高 ADR 才有彈性
           REPAIR_MAX_52W_DISTANCE = 60.0
           REPAIR_MIN_ADR = 4.0
           REPAIR_MIN_1M_RETURN = 8.0
           REPAIR_MIN_3M_RETURN = 20.0
           REPAIR_MIN_SCORE = 45.0
 
-          # Base Breakout Watch
+          # Base Breakout Watch：base 要緊，ADR 太高反而可能代表不夠 tight
           BASE_MAX_52W_DISTANCE = 60.0
-          BASE_MIN_ADR = 4.0
-          BASE_MAX_RANGE_10 = 12.0
+          BASE_MIN_ADR = 2.5
+          BASE_MAX_ADR = 4.0
+          BASE_MAX_RANGE_10 = 10.0
           BASE_MIN_1M_RETURN = 5.0
           BASE_MIN_SCORE = 45.0
 
@@ -551,8 +552,10 @@ jobs:
                   score += 30
               elif range_10_pct <= 8:
                   score += 22
+              elif range_10_pct <= 10:
+                  score += 16
               elif range_10_pct <= 12:
-                  score += 12
+                  score += 8
 
               if impulse_50d >= 50:
                   score += 20
@@ -653,7 +656,7 @@ jobs:
 
               is_base_watch = (
                   distance_52w <= BASE_MAX_52W_DISTANCE
-                  and adr_20 >= BASE_MIN_ADR
+                  and BASE_MIN_ADR <= adr_20 <= BASE_MAX_ADR
                   and returns["ret_1m"] >= BASE_MIN_1M_RETURN
                   and range_10_pct <= BASE_MAX_RANGE_10
                   and above_20
@@ -992,6 +995,7 @@ jobs:
                               f"Dist52W={distance_52w:.2f}% | "
                               f"Risk={risk_pct} | "
                               f"Range10={consolidation_details.get('range_10_pct', 999):.2f}% | "
+                              f"DryUp={consolidation_details.get('volume_dry_up_score', 0):.1f} | "
                               f"SMA50={momentum_details.get('sma_50')} | "
                               f"SMA200={momentum_details.get('sma_200')} | "
                               f"SMA50Up={momentum_details.get('sma_50_turning_up')}"
@@ -1030,6 +1034,9 @@ jobs:
                           f"10日range {consolidation_details.get('range_10_pct', 999):.1f}%",
                           f"risk {risk_pct:.1f}%",
                       ]
+
+                      if setup_type == "Base Breakout Watch":
+                          reason_bits.append(f"Base ADR區間 {BASE_MIN_ADR}-{BASE_MAX_ADR}%")
 
                       if momentum_details.get("sma_50_turning_up", False):
                           reason_bits.append("50MA轉上")
@@ -1133,6 +1140,7 @@ jobs:
                   msg += f"Stale skipped：{stale_count}\n"
                   msg += f"Other skipped：{skipped_count}\n"
                   msg += "類型：High Tight / Second Launch Repair / Base Breakout Watch\n"
+                  msg += "ADR規則：Leader≥4%，Repair≥4%，Base=2.5–4.0%\n"
                   msg += "注意：盤後模式不會刪除最新日線 candle，應顯示最新完成交易日。\n\n"
 
                   for idx, row in top.iterrows():
