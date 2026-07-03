@@ -102,16 +102,17 @@ jobs:
 
           # Second Launch / Repair
           REPAIR_MAX_52W_DISTANCE = 60.0
-          REPAIR_MIN_ADR = 3.5
+          REPAIR_MIN_ADR = 4.0
           REPAIR_MIN_1M_RETURN = 8.0
           REPAIR_MIN_3M_RETURN = 20.0
           REPAIR_MIN_SCORE = 45.0
 
           # Base Breakout Watch
           BASE_MAX_52W_DISTANCE = 60.0
-          BASE_MIN_ADR = 2.5
+          BASE_MIN_ADR = 4.0
           BASE_MAX_RANGE_10 = 12.0
-          BASE_MIN_SCORE = 40.0
+          BASE_MIN_1M_RETURN = 5.0
+          BASE_MIN_SCORE = 45.0
 
           INVALID_TICKERS = {
               "INFO", "ATVI", "ALXN", "CELG", "CTXS", "MXIM", "NUAN",
@@ -257,10 +258,13 @@ jobs:
               return age_days > max_stale_days, last_date_only.strftime("%Y-%m-%d"), age_days
 
 
-          def get_completed_daily_df(df):
+          def get_completed_daily_df(df, remove_today_partial=False):
               """
-              In intraday mode, Yahoo daily data may include today's partial daily bar.
-              Remove today's bar so prev_close / prev_high are from completed session.
+              Intraday mode:
+                Remove today's possible partial daily bar, so prev_close / prev_high are from completed session.
+
+              EOD mode:
+                Do NOT remove the latest daily bar. After US close, that latest bar is exactly what we want.
               """
               if df is None or df.empty:
                   return pd.DataFrame()
@@ -270,11 +274,12 @@ jobs:
               if df.empty:
                   return df
 
-              today_utc = datetime.utcnow().date()
-              last_date = pd.Timestamp(df.index[-1]).date()
+              if remove_today_partial:
+                  today_utc = datetime.utcnow().date()
+                  last_date = pd.Timestamp(df.index[-1]).date()
 
-              if last_date >= today_utc and len(df) >= 2:
-                  df = df.iloc[:-1]
+                  if last_date >= today_utc and len(df) >= 2:
+                      df = df.iloc[:-1]
 
               return df
 
@@ -649,6 +654,7 @@ jobs:
               is_base_watch = (
                   distance_52w <= BASE_MAX_52W_DISTANCE
                   and adr_20 >= BASE_MIN_ADR
+                  and returns["ret_1m"] >= BASE_MIN_1M_RETURN
                   and range_10_pct <= BASE_MAX_RANGE_10
                   and above_20
                   and above_50
@@ -676,7 +682,10 @@ jobs:
 
 
           def classify_intraday_ep_bo(ticker, daily_df, intraday_df):
-              completed_daily = get_completed_daily_df(daily_df)
+              completed_daily = get_completed_daily_df(
+                  daily_df,
+                  remove_today_partial=True
+              )
 
               if completed_daily.empty or len(completed_daily) < 30:
                   return None
@@ -791,6 +800,7 @@ jobs:
 
           print(f"Mode: {MODE_NAME}")
           print(f"HK time: {hk_now.strftime('%Y-%m-%d %H:%M')}")
+          print(f"UTC time: {now_utc.strftime('%Y-%m-%d %H:%M')}")
           print(f"Loaded {len(tickers)} tickers")
 
           # =====================================================
@@ -818,8 +828,15 @@ jobs:
           spy_df = flatten_yfinance_df(spy_df).dropna(subset=["Close", "High", "Low"])
           qqq_df = flatten_yfinance_df(qqq_df).dropna(subset=["Close", "High", "Low"])
 
-          spy_daily_completed = get_completed_daily_df(spy_df)
-          qqq_daily_completed = get_completed_daily_df(qqq_df)
+          spy_daily_completed = get_completed_daily_df(
+              spy_df,
+              remove_today_partial=IS_INTRADAY_MODE
+          )
+
+          qqq_daily_completed = get_completed_daily_df(
+              qqq_df,
+              remove_today_partial=IS_INTRADAY_MODE
+          )
 
           results = []
           stale_count = 0
@@ -908,7 +925,10 @@ jobs:
                       # EOD setup mode
                       # =================================================
 
-                      daily_completed = get_completed_daily_df(daily_df)
+                      daily_completed = get_completed_daily_df(
+                          daily_df,
+                          remove_today_partial=False
+                      )
 
                       if daily_completed.empty or len(daily_completed) < 220:
                           debug_skip(ticker, "completed daily data too short")
@@ -1057,6 +1077,7 @@ jobs:
           if not results:
               msg = f"📭【{MODE_NAME}】今日暫時無符合條件股票。\n\n"
               msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+              msg += f"UTC Time：{now_utc.strftime('%Y-%m-%d %H:%M')}\n"
               msg += f"Stale skipped：{stale_count}\n"
               msg += f"Other skipped：{skipped_count}\n"
 
@@ -1076,6 +1097,7 @@ jobs:
 
                   msg = "🔥【Kati 盤中 EP / BO 火箭監測】🔥\n\n"
                   msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+                  msg += f"UTC Time：{now_utc.strftime('%Y-%m-%d %H:%M')}\n"
                   msg += f"入選數量：{len(df_res)}\n"
                   msg += "條件：5m data、突破昨日高位、強即時升幅、time-adjusted RVOL、成交額≥$20M\n\n"
 
@@ -1106,10 +1128,12 @@ jobs:
 
                   msg = "🌙【Kati 盤後 Setup 監測｜Leader + Repair + Base】🌙\n\n"
                   msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
+                  msg += f"UTC Time：{now_utc.strftime('%Y-%m-%d %H:%M')}\n"
                   msg += f"入選數量：{len(df_res)}\n"
                   msg += f"Stale skipped：{stale_count}\n"
                   msg += f"Other skipped：{skipped_count}\n"
-                  msg += "類型：High Tight / Second Launch Repair / Base Breakout Watch\n\n"
+                  msg += "類型：High Tight / Second Launch Repair / Base Breakout Watch\n"
+                  msg += "注意：盤後模式不會刪除最新日線 candle，應顯示最新完成交易日。\n\n"
 
                   for idx, row in top.iterrows():
                       msg += f"#{idx + 1} {row['ticker']}｜{row['setup_type']}\n"
