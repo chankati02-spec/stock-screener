@@ -4,11 +4,11 @@ on:
   schedule:
     # 盤中 EP / BO 掃描：香港時間 21:45、22:15、22:45、23:15、23:45
     # 美股夏令時間適用；冬令時間要整體延後 1 小時
-    - cron: '45 13 * * 1-5'
-    - cron: '15 14 * * 1-5'
-    - cron: '45 14 * * 1-5'
-    - cron: '15 15 * * 1-5'
-    - cron: '45 15 * * 1-5'
+    - cron: '47 13 * * 1-5'
+    - cron: '17 14 * * 1-5'
+    - cron: '47 14 * * 1-5'
+    - cron: '17 15 * * 1-5'
+    - cron: '47 15 * * 1-5'
 
     # 盤後 setup 掃描：香港時間 05:37、06:12
     - cron: '37 21 * * 1-5'
@@ -58,15 +58,28 @@ jobs:
           from datetime import datetime, timedelta
 
           # =====================================================
-          # Mode detection
+          # Time / Mode detection
           # =====================================================
 
           now_utc = datetime.utcnow()
           hk_now = now_utc + timedelta(hours=8)
-          hk_hour = hk_now.hour
+          hk_minutes = hk_now.hour * 60 + hk_now.minute
 
-          # 香港 21:00–23:59 = 美股早盤 intraday 掃描
-          IS_INTRADAY_MODE = 21 <= hk_hour <= 23
+          # 盤中允許窗口：香港 21:35–23:59
+          # 用 window 而不是 exact cron，因為 GitHub schedule 可能 delay
+          INTRADAY_START = 21 * 60 + 35
+          INTRADAY_END = 23 * 60 + 59
+
+          # 盤後允許窗口：香港 05:20–06:40
+          EOD_START = 5 * 60 + 20
+          EOD_END = 6 * 60 + 40
+
+          IS_INTRADAY_MODE = INTRADAY_START <= hk_minutes <= INTRADAY_END
+          IS_EOD_MODE = EOD_START <= hk_minutes <= EOD_END
+
+          if not IS_INTRADAY_MODE and not IS_EOD_MODE:
+              print(f"Outside allowed HK run window. HK time = {hk_now.strftime('%Y-%m-%d %H:%M')}. No Telegram sent.")
+              raise SystemExit(0)
 
           MODE_NAME = "盤中 EP / BO 模式" if IS_INTRADAY_MODE else "盤後 Setup 模式"
 
@@ -90,24 +103,25 @@ jobs:
           EP_MIN_ADJ_RVOL = 3.0
           BO_MIN_DAY_CHANGE = 3.0
           BO_MIN_ADJ_RVOL = 2.0
+          BO_MIN_ADR = 3.0
 
           # EOD setup common
           MAX_SETUP_RISK_PCT = 12.0
 
-          # High Tight Leader：強勢股可以接受高 ADR
+          # High Tight Leader：強勢 leader 要高 ADR
           HIGH_TIGHT_MAX_52W_DISTANCE = 25.0
           HIGH_TIGHT_MIN_ADR = 4.0
           HIGH_TIGHT_MIN_3M_RETURN = 25.0
           HIGH_TIGHT_MIN_SCORE = 50.0
 
-          # Second Launch / Repair：修復股仍需要高 ADR 才有彈性
+          # Second Launch / Repair：修復股都需要高 ADR 才有彈性
           REPAIR_MAX_52W_DISTANCE = 60.0
           REPAIR_MIN_ADR = 4.0
           REPAIR_MIN_1M_RETURN = 8.0
           REPAIR_MIN_3M_RETURN = 20.0
           REPAIR_MIN_SCORE = 45.0
 
-          # Base Breakout Watch：base 要緊，ADR 太高反而可能代表不夠 tight
+          # Base Breakout Watch：base 要 tight，ADR 2.5–4.0 較合理
           BASE_MAX_52W_DISTANCE = 60.0
           BASE_MIN_ADR = 2.5
           BASE_MAX_ADR = 4.0
@@ -126,7 +140,7 @@ jobs:
           WATCH_DEBUG_TICKERS = {"AXP", "BRKR", "GEV", "WING"}
 
           # =====================================================
-          # Helpers
+          # Basic helpers
           # =====================================================
 
           def debug_skip(ticker, reason):
@@ -265,7 +279,7 @@ jobs:
                 Remove today's possible partial daily bar, so prev_close / prev_high are from completed session.
 
               EOD mode:
-                Do NOT remove the latest daily bar. After US close, that latest bar is exactly what we want.
+                Do NOT remove latest daily bar. After US close, latest bar is what we want.
               """
               if df is None or df.empty:
                   return pd.DataFrame()
@@ -284,6 +298,10 @@ jobs:
 
               return df
 
+
+          # =====================================================
+          # Indicator helpers
+          # =====================================================
 
           def calculate_adr(df, period=20):
               if df is None or df.empty or len(df) < period:
@@ -438,6 +456,51 @@ jobs:
                   "sma_50_turning_up": sma_50_turning_up,
               }
 
+
+          def calculate_intraday_indicators(intraday_df):
+              """
+              5m data indicators:
+              - VWAP
+              - EMA9
+              - EMA20
+              - Opening range high
+              """
+              df = intraday_df.copy()
+              df = df.dropna(subset=["Close", "High", "Low", "Volume"])
+
+              if df.empty:
+                  return None
+
+              typical_price = (df["High"] + df["Low"] + df["Close"]) / 3
+              cumulative_pv = (typical_price * df["Volume"]).cumsum()
+              cumulative_vol = df["Volume"].cumsum()
+
+              df["VWAP"] = cumulative_pv / cumulative_vol.replace(0, np.nan)
+              df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
+              df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+
+              # Opening range：頭 30 分鐘，即 6 條 5m candle。
+              # 如果 21:45 太早，只有 2–3 條 candle，就用現有 candle 計。
+              opening_bars = min(6, len(df))
+              opening_range_high = float(df["High"].iloc[:opening_bars].max())
+
+              latest = df.iloc[-1]
+
+              return {
+                  "df": df,
+                  "price": float(latest["Close"]),
+                  "vwap": float(latest["VWAP"]) if not pd.isna(latest["VWAP"]) else None,
+                  "ema9": float(latest["EMA9"]) if not pd.isna(latest["EMA9"]) else None,
+                  "ema20": float(latest["EMA20"]) if not pd.isna(latest["EMA20"]) else None,
+                  "opening_range_high": opening_range_high,
+                  "volume_sum": float(df["Volume"].sum()),
+                  "data_time": str(df.index[-1]),
+              }
+
+
+          # =====================================================
+          # EOD scoring
+          # =====================================================
 
           def calculate_momentum_score(df, spy_df=None, qqq_df=None):
               if df is None or df.empty or len(df) < 200:
@@ -670,6 +733,10 @@ jobs:
               return None
 
 
+          # =====================================================
+          # Intraday EP / BO classification
+          # =====================================================
+
           def get_market_elapsed_minutes_utc():
               open_time = now_utc.replace(
                   hour=MARKET_OPEN_UTC_HOUR,
@@ -696,9 +763,14 @@ jobs:
               if intraday_df is None or intraday_df.empty:
                   return None
 
-              intraday_df = intraday_df.dropna(subset=["Close", "High", "Low"])
+              intraday_df = intraday_df.dropna(subset=["Close", "High", "Low", "Volume"])
 
               if intraday_df.empty:
+                  return None
+
+              indicators = calculate_intraday_indicators(intraday_df)
+
+              if indicators is None:
                   return None
 
               prev_close = float(completed_daily["Close"].iloc[-1])
@@ -706,13 +778,20 @@ jobs:
               avg_vol_20 = float(completed_daily["Volume"].iloc[-20:].mean())
               adr_20 = calculate_adr(completed_daily, 20)
 
-              current_price = float(intraday_df["Close"].iloc[-1])
-              current_volume = float(intraday_df["Volume"].sum())
+              current_price = indicators["price"]
+              current_volume = indicators["volume_sum"]
+              vwap = indicators["vwap"]
+              ema9 = indicators["ema9"]
+              ema20 = indicators["ema20"]
+              opening_range_high = indicators["opening_range_high"]
 
               if current_price < MIN_PRICE:
                   return None
 
               if avg_vol_20 <= 0:
+                  return None
+
+              if vwap is None or ema9 is None or ema20 is None:
                   return None
 
               day_change = safe_pct_change(current_price, prev_close)
@@ -723,7 +802,12 @@ jobs:
               adjusted_rvol = raw_rvol / expected_fraction
 
               turnover = current_price * current_volume
+
               breaks_prev_high = current_price > prev_high
+              breaks_opening_range = current_price > opening_range_high
+              above_vwap = current_price > vwap
+              above_ema9 = current_price > ema9
+              ema9_above_ema20 = ema9 > ema20
 
               if turnover < INTRADAY_MIN_TURNOVER:
                   return None
@@ -732,13 +816,19 @@ jobs:
                   day_change >= EP_MIN_DAY_CHANGE
                   and adjusted_rvol >= EP_MIN_ADJ_RVOL
                   and breaks_prev_high
+                  and above_vwap
+                  and above_ema9
               )
 
               is_bo = (
                   day_change >= BO_MIN_DAY_CHANGE
                   and adjusted_rvol >= BO_MIN_ADJ_RVOL
                   and breaks_prev_high
-                  and adr_20 >= 3.0
+                  and breaks_opening_range
+                  and above_vwap
+                  and above_ema9
+                  and ema9_above_ema20
+                  and adr_20 >= BO_MIN_ADR
               )
 
               if is_ep:
@@ -751,8 +841,11 @@ jobs:
               score = 0.0
               score += min(day_change * 4, 40)
               score += min(adjusted_rvol * 10, 30)
-              score += 15 if breaks_prev_high else 0
-              score += min(adr_20 * 3, 15)
+              score += 10 if breaks_prev_high else 0
+              score += 8 if breaks_opening_range else 0
+              score += 6 if above_vwap else 0
+              score += 4 if ema9_above_ema20 else 0
+              score += min(adr_20 * 2, 12)
 
               return {
                   "ticker": ticker,
@@ -761,13 +854,19 @@ jobs:
                   "price": round(current_price, 2),
                   "prev_close": round(prev_close, 2),
                   "prev_high": round(prev_high, 2),
+                  "opening_range_high": round(opening_range_high, 2),
                   "day_change": round(day_change, 2),
                   "raw_rvol": round(raw_rvol, 2),
                   "adjusted_rvol": round(adjusted_rvol, 2),
                   "turnover_m": round(turnover / 1_000_000, 2),
                   "adr_20": round(adr_20, 2),
+                  "vwap": round(vwap, 2),
+                  "ema9": round(ema9, 2),
+                  "ema20": round(ema20, 2),
+                  "above_vwap": above_vwap,
+                  "ema9_above_ema20": ema9_above_ema20,
                   "score": round(min(score, 100), 2),
-                  "data_time": str(intraday_df.index[-1]),
+                  "data_time": indicators["data_time"],
               }
 
 
@@ -845,7 +944,7 @@ jobs:
           stale_count = 0
           skipped_count = 0
 
-          batch_size = 35 if IS_INTRADAY_MODE else 45
+          batch_size = 30 if IS_INTRADAY_MODE else 45
 
           # =====================================================
           # Main loop
@@ -1106,12 +1205,13 @@ jobs:
                   msg += f"HK Time：{hk_now.strftime('%Y-%m-%d %H:%M')}\n"
                   msg += f"UTC Time：{now_utc.strftime('%Y-%m-%d %H:%M')}\n"
                   msg += f"入選數量：{len(df_res)}\n"
-                  msg += "條件：5m data、突破昨日高位、強即時升幅、time-adjusted RVOL、成交額≥$20M\n\n"
+                  msg += "條件：5m data、突破昨日高位/開市區間、VWAP、EMA9/20、time-adjusted RVOL、成交額≥$20M\n\n"
 
                   for idx, row in top.iterrows():
                       msg += f"#{idx + 1} {row['ticker']}｜{row['setup_type']}\n"
                       msg += f"   現價: ${row['price']} | 漲幅: +{row['day_change']:.1f}% | 分數: {row['score']:.1f}\n"
-                      msg += f"   前高: ${row['prev_high']} | 前收: ${row['prev_close']}\n"
+                      msg += f"   前高: ${row['prev_high']} | 前收: ${row['prev_close']} | OR High: ${row['opening_range_high']}\n"
+                      msg += f"   VWAP: ${row['vwap']} | EMA9: ${row['ema9']} | EMA20: ${row['ema20']}\n"
                       msg += f"   Raw RVOL: {row['raw_rvol']:.2f} | Adj RVOL: {row['adjusted_rvol']:.2f}\n"
                       msg += f"   Turnover: ${row['turnover_m']:.1f}M | ADR: {row['adr_20']:.1f}%\n"
                       msg += f"   Data time: {row['data_time']}\n"
