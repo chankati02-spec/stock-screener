@@ -4,13 +4,13 @@ on:
   schedule:
     # 盤中 EP / BO 掃描：香港時間 21:45、22:15、22:45、23:15、23:45
     # 美股夏令時間適用；冬令時間要整體延後 1 小時
-    - cron: '47 13 * * 1-5'
-    - cron: '17 14 * * 1-5'
-    - cron: '47 14 * * 1-5'
-    - cron: '17 15 * * 1-5'
-    - cron: '47 15 * * 1-5'
+    - cron: '45 13 * * 1-5'
+    - cron: '15 14 * * 1-5'
+    - cron: '45 14 * * 1-5'
+    - cron: '15 15 * * 1-5'
+    - cron: '45 15 * * 1-5'
 
-    # 盤後 setup 掃描：香港時間 05:37、06:12
+    # 盤後 setup 掃描：香港時間 Tue-Sat 05:37、06:12
     - cron: '37 21 * * 1-5'
     - cron: '12 22 * * 1-5'
 
@@ -65,17 +65,24 @@ jobs:
           hk_now = now_utc + timedelta(hours=8)
           hk_minutes = hk_now.hour * 60 + hk_now.minute
 
-          # 盤中允許窗口：香港 21:35–23:59
-          # 用 window 而不是 exact cron，因為 GitHub schedule 可能 delay
+          # 盤中允許窗口：香港 21:35–00:30
+          # 跨午夜，所以要用 OR
           INTRADAY_START = 21 * 60 + 35
-          INTRADAY_END = 23 * 60 + 59
+          INTRADAY_END_AFTER_MIDNIGHT = 0 * 60 + 30
 
-          # 盤後允許窗口：香港 05:20–06:40
+          # 盤後 setup：香港 05:20 之後都可以跑
+          # 因為盤後只用 daily completed candle，不需要精準時間
           EOD_START = 5 * 60 + 20
-          EOD_END = 6 * 60 + 40
 
-          IS_INTRADAY_MODE = INTRADAY_START <= hk_minutes <= INTRADAY_END
-          IS_EOD_MODE = EOD_START <= hk_minutes <= EOD_END
+          IS_INTRADAY_MODE = (
+              hk_minutes >= INTRADAY_START
+              or hk_minutes <= INTRADAY_END_AFTER_MIDNIGHT
+          )
+
+          IS_EOD_MODE = (
+              hk_minutes >= EOD_START
+              and not IS_INTRADAY_MODE
+          )
 
           if not IS_INTRADAY_MODE and not IS_EOD_MODE:
               print(f"Outside allowed HK run window. HK time = {hk_now.strftime('%Y-%m-%d %H:%M')}. No Telegram sent.")
@@ -108,20 +115,20 @@ jobs:
           # EOD setup common
           MAX_SETUP_RISK_PCT = 12.0
 
-          # High Tight Leader：強勢 leader 要高 ADR
+          # High Tight Leader
           HIGH_TIGHT_MAX_52W_DISTANCE = 25.0
           HIGH_TIGHT_MIN_ADR = 4.0
           HIGH_TIGHT_MIN_3M_RETURN = 25.0
           HIGH_TIGHT_MIN_SCORE = 50.0
 
-          # Second Launch / Repair：修復股都需要高 ADR 才有彈性
+          # Second Launch / Repair
           REPAIR_MAX_52W_DISTANCE = 60.0
           REPAIR_MIN_ADR = 4.0
           REPAIR_MIN_1M_RETURN = 8.0
           REPAIR_MIN_3M_RETURN = 20.0
           REPAIR_MIN_SCORE = 45.0
 
-          # Base Breakout Watch：base 要 tight，ADR 2.5–4.0 較合理
+          # Base Breakout Watch
           BASE_MAX_52W_DISTANCE = 60.0
           BASE_MIN_ADR = 2.5
           BASE_MAX_ADR = 4.0
@@ -458,13 +465,6 @@ jobs:
 
 
           def calculate_intraday_indicators(intraday_df):
-              """
-              5m data indicators:
-              - VWAP
-              - EMA9
-              - EMA20
-              - Opening range high
-              """
               df = intraday_df.copy()
               df = df.dropna(subset=["Close", "High", "Low", "Volume"])
 
@@ -479,8 +479,6 @@ jobs:
               df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
               df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
 
-              # Opening range：頭 30 分鐘，即 6 條 5m candle。
-              # 如果 21:45 太早，只有 2–3 條 candle，就用現有 candle 計。
               opening_bars = min(6, len(df))
               opening_range_high = float(df["High"].iloc[:opening_bars].max())
 
@@ -1241,7 +1239,7 @@ jobs:
                   msg += f"Other skipped：{skipped_count}\n"
                   msg += "類型：High Tight / Second Launch Repair / Base Breakout Watch\n"
                   msg += "ADR規則：Leader≥4%，Repair≥4%，Base=2.5–4.0%\n"
-                  msg += "注意：盤後模式不會刪除最新日線 candle，應顯示最新完成交易日。\n\n"
+                  msg += "注意：盤後模式不設上限時間；只要不是盤中 window，05:20 HK 後都可以跑 setup。\n\n"
 
                   for idx, row in top.iterrows():
                       msg += f"#{idx + 1} {row['ticker']}｜{row['setup_type']}\n"
