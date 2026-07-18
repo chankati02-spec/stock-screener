@@ -1269,11 +1269,11 @@ jobs:
           # Fixed public JSON outputs
           # =====================================================
 
-          os.makedirs("data", exist_ok=True)
+          os.makedirs("watchlists", exist_ok=True)
 
           mode_slug = "intraday" if IS_INTRADAY_MODE else "eod"
-          mode_file = f"data/latest_{mode_slug}_watchlist.json"
-          latest_file = "data/today_watchlist.json"
+          mode_file = f"watchlists/latest_{mode_slug}.json"
+          latest_file = "watchlists/latest.json"
 
           payload = {
               "schema_version": 1,
@@ -1312,15 +1312,15 @@ jobs:
           echo "Git status before commit:"
           git status --short
 
-          echo "Files inside data folder:"
-          ls -la data
+          echo "Files inside watchlists folder:"
+          ls -la watchlists
 
           echo "Generated JSON files:"
-          find data -maxdepth 1 -type f -name "*.json" -print
+          find watchlists -maxdepth 1 -type f -name "*.json" -print
 
-          test -f data/today_watchlist.json
+          test -f watchlists/latest.json
 
-          if [[ ! -f data/latest_intraday_watchlist.json && ! -f data/latest_eod_watchlist.json ]]; then
+          if [[ ! -f watchlists/latest_intraday.json && ! -f watchlists/latest_eod.json ]]; then
             echo "Error: no mode-specific watchlist JSON was generated."
             exit 1
           fi
@@ -1333,10 +1333,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -- data/*.json
+          git add -- watchlists/*.json
 
           echo "Staged JSON changes:"
-          git diff --cached --name-status -- data/
+          git diff --cached --name-status -- watchlists/
 
           if git diff --cached --quiet; then
             echo "No JSON changes to commit."
