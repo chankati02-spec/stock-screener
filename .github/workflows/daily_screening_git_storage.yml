@@ -22,6 +22,13 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
+concurrency:
+  group: stock-screening-json
+  cancel-in-progress: false
+
 jobs:
   screen-stocks:
     runs-on: ubuntu-latest
@@ -30,7 +37,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,6 +56,7 @@ jobs:
         run: |
           python3 << 'PYTHON_SCRIPT'
           import os
+          import json
           import yaml
           import requests
           import yfinance as yf
@@ -1187,6 +1195,7 @@ jobs:
 
               send_telegram_message(token, chat_id, msg)
               print(msg)
+              json_rows = []
 
           else:
               df_res = pd.DataFrame(results)
@@ -1253,4 +1262,64 @@ jobs:
               send_telegram_message(token, chat_id, msg)
               print("✓ Telegram message sent")
 
+              # Convert the already sorted Telegram selection to JSON-safe values.
+              json_rows = json.loads(top.to_json(orient="records", date_format="iso"))
+
+          # =====================================================
+          # Fixed public JSON outputs
+          # =====================================================
+
+          os.makedirs("data", exist_ok=True)
+
+          mode_slug = "intraday" if IS_INTRADAY_MODE else "eod"
+          mode_file = f"data/latest_{mode_slug}_watchlist.json"
+          latest_file = "data/today_watchlist.json"
+
+          payload = {
+              "schema_version": 1,
+              "generated_at_utc": now_utc.replace(microsecond=0).isoformat() + "Z",
+              "generated_at_hk": hk_now.replace(microsecond=0).isoformat() + "+08:00",
+              "mode": "INTRADAY" if IS_INTRADAY_MODE else "EOD",
+              "mode_name": MODE_NAME,
+              "market_date": (
+                  json_rows[0].get("price_date")
+                  if json_rows and not IS_INTRADAY_MODE
+                  else now_utc.strftime("%Y-%m-%d")
+              ),
+              "selected_count": len(results),
+              "published_count": len(json_rows),
+              "stale_skipped": stale_count,
+              "other_skipped": skipped_count,
+              "stocks": json_rows,
+          }
+
+          for path in (mode_file, latest_file):
+              with open(path, "w", encoding="utf-8") as f:
+                  json.dump(payload, f, ensure_ascii=False, indent=2)
+                  f.write("\n")
+              print(f"✓ JSON written: {path}")
+
           PYTHON_SCRIPT
+
+      - name: Commit latest watchlist JSON
+        shell: bash
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/today_watchlist.json data/latest_intraday_watchlist.json data/latest_eod_watchlist.json 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No JSON changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update latest stock watchlist JSON"
+
+          # Retry once if another scheduled run updated the branch first.
+          if ! git push; then
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi
