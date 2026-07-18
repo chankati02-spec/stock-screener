@@ -1300,6 +1300,17 @@ jobs:
               print(f"✓ JSON written: {path}")
 
           PYTHON_SCRIPT
+                - name: Check generated JSON files
+        shell: bash
+        run: |
+          echo "Current folder:"
+          pwd
+
+          echo "Files inside data folder:"
+          ls -la data || true
+
+          echo "All JSON files:"
+          find . -type f -name "*.json"
 
       - name: Commit latest watchlist JSON
         shell: bash
@@ -1309,7 +1320,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data/today_watchlist.json data/latest_intraday_watchlist.json data/latest_eod_watchlist.json 2>/dev/null || true
+          git add data/today_watchlist.json \
+                  data/latest_intraday_watchlist.json \
+                  data/latest_eod_watchlist.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No JSON changes to commit."
@@ -1318,7 +1331,6 @@ jobs:
 
           git commit -m "Update latest stock watchlist JSON"
 
-          # Retry once if another scheduled run updated the branch first.
           if ! git push; then
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push
