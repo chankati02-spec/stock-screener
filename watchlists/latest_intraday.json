@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-07-28T16:14:42Z",
-  "generated_at_hk": "2026-07-29T00:14:42+08:00",
+  "generated_at_utc": "2026-07-28T16:22:45Z",
+  "generated_at_hk": "2026-07-29T00:22:45+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-07-28",
@@ -14,22 +14,22 @@
       "ticker": "TEAM",
       "mode": "INTRADAY",
       "setup_type": "Intraday Breakout",
-      "price": 101.29,
+      "price": 101.46,
       "prev_close": 95.87,
       "prev_high": 97.73,
       "opening_range_high": 99.98,
-      "day_change": 5.65,
-      "raw_rvol": 1.03,
-      "adjusted_rvol": 2.43,
-      "turnover_m": 367.04,
+      "day_change": 5.83,
+      "raw_rvol": 1.04,
+      "adjusted_rvol": 2.35,
+      "turnover_m": 372.0,
       "adr_20": 6.31,
-      "vwap": 99.39,
-      "ema9": 100.78,
-      "ema20": 100.24,
+      "vwap": 99.41,
+      "ema9": 101.03,
+      "ema20": 100.47,
       "above_vwap": true,
       "ema9_above_ema20": true,
-      "score": 86.96,
-      "data_time": "2026-07-28 12:10:00-04:00"
+      "score": 86.81,
+      "data_time": "2026-07-28 12:20:00-04:00"
     }
   ]
 }
