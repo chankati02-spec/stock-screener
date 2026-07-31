@@ -1,13 +1,35 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-07-31T14:20:39Z",
-  "generated_at_hk": "2026-07-31T22:20:39+08:00",
+  "generated_at_utc": "2026-07-31T15:49:05Z",
+  "generated_at_hk": "2026-07-31T23:49:05+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-07-31",
-  "selected_count": 0,
-  "published_count": 0,
+  "selected_count": 1,
+  "published_count": 1,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": []
+  "other_skipped": 418,
+  "stocks": [
+    {
+      "ticker": "DXCM",
+      "mode": "INTRADAY",
+      "setup_type": "Intraday EP Rocket",
+      "price": 82.61,
+      "prev_close": 74.54,
+      "prev_high": 74.87,
+      "opening_range_high": 84.59,
+      "day_change": 10.83,
+      "raw_rvol": 1.29,
+      "adjusted_rvol": 3.62,
+      "turnover_m": 472.12,
+      "adr_20": 3.4,
+      "vwap": 82.48,
+      "ema9": 82.35,
+      "ema20": 82.3,
+      "above_vwap": true,
+      "ema9_above_ema20": true,
+      "score": 96.8,
+      "data_time": "2026-07-31 11:45:00-04:00"
+    }
+  ]
 }
