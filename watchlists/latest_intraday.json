@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-07-31T16:22:11Z",
-  "generated_at_hk": "2026-08-01T00:22:11+08:00",
+  "generated_at_utc": "2026-08-03T13:50:27Z",
+  "generated_at_hk": "2026-08-03T21:50:27+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-07-31",
-  "selected_count": 1,
-  "published_count": 1,
+  "market_date": "2026-08-03",
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 418,
-  "stocks": [
-    {
-      "ticker": "AMZN",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday EP Rocket",
-      "price": 270.72,
-      "prev_close": 235.5,
-      "prev_high": 239.82,
-      "opening_range_high": 269.99,
-      "day_change": 14.96,
-      "raw_rvol": 1.89,
-      "adjusted_rvol": 4.27,
-      "turnover_m": 21176.65,
-      "adr_20": 2.47,
-      "vwap": 268.43,
-      "ema9": 269.71,
-      "ema20": 269.36,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 100,
-      "data_time": "2026-07-31 12:20:00-04:00"
-    }
-  ]
+  "other_skipped": 419,
+  "stocks": []
 }
