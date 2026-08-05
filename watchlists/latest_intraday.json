@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-05T16:07:27Z",
-  "generated_at_hk": "2026-08-06T00:07:27+08:00",
+  "generated_at_utc": "2026-08-05T16:19:46Z",
+  "generated_at_hk": "2026-08-06T00:19:46+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-08-05",
-  "selected_count": 1,
-  "published_count": 1,
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 418,
-  "stocks": [
-    {
-      "ticker": "MOS",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday Breakout",
-      "price": 23.59,
-      "prev_close": 22.71,
-      "prev_high": 22.75,
-      "opening_range_high": 23.17,
-      "day_change": 3.9,
-      "raw_rvol": 0.92,
-      "adjusted_rvol": 2.27,
-      "turnover_m": 156.68,
-      "adr_20": 3.6,
-      "vwap": 23.2,
-      "ema9": 23.58,
-      "ema20": 23.53,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 73.47,
-      "data_time": "2026-08-05 12:05:00-04:00"
-    }
-  ]
+  "other_skipped": 419,
+  "stocks": []
 }
