@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-05T16:19:46Z",
-  "generated_at_hk": "2026-08-06T00:19:46+08:00",
+  "generated_at_utc": "2026-08-06T13:56:28Z",
+  "generated_at_hk": "2026-08-06T21:56:28+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-08-05",
+  "market_date": "2026-08-06",
   "selected_count": 0,
   "published_count": 0,
   "stale_skipped": 0,
