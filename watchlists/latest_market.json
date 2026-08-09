@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "date": "2026-08-08",
-  "generated_at": "2026-08-09T00:53:48Z",
-  "generated_at_utc": "2026-08-09T00:53:48Z",
-  "generated_at_hk": "2026-08-09T08:53:48+08:00",
+  "date": "2026-08-07",
+  "generated_at": "2026-08-09T01:03:37Z",
+  "generated_at_utc": "2026-08-09T01:03:37Z",
+  "generated_at_hk": "2026-08-09T09:03:37+08:00",
   "data_timestamp": "2026-08-07",
-  "market_date": "2026-08-08",
+  "market_date": "2026-08-07",
   "market_mode": "eod",
   "mode": "MARKET_EOD",
   "market_regime": {
@@ -204,6 +204,8 @@
   "freshness": {
     "status": "ok",
     "benchmark_data_timestamp": "2026-08-07",
+    "age_minutes": null,
+    "stale_after_minutes": null,
     "universe_coverage_pct": 96.42
   }
 }
