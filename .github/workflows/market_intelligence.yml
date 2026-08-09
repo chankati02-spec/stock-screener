@@ -1,0 +1,229 @@
+name: Market Intelligence JSON
+
+on:
+  schedule:
+    # US regular session, every 30 minutes.
+    # These UTC times are correct during US daylight saving time (EDT):
+    # 13:35, 14:05, ... 19:35 UTC = 09:35, 10:05, ... 15:35 ET.
+    #
+    # IMPORTANT:
+    # GitHub Actions cron is UTC and does not automatically shift for DST.
+    # During US standard time (EST), move these schedules +1 hour.
+    - cron: '35 13 * * 1-5'
+    - cron: '5 14 * * 1-5'
+    - cron: '35 14 * * 1-5'
+    - cron: '5 15 * * 1-5'
+    - cron: '35 15 * * 1-5'
+    - cron: '5 16 * * 1-5'
+    - cron: '35 16 * * 1-5'
+    - cron: '5 17 * * 1-5'
+    - cron: '35 17 * * 1-5'
+    - cron: '5 18 * * 1-5'
+    - cron: '35 18 * * 1-5'
+    - cron: '5 19 * * 1-5'
+    - cron: '35 19 * * 1-5'
+
+    # EOD run after US close.
+    # 20:35 UTC = 16:35 ET during daylight saving time.
+    # During US standard time, move this to 21:35 UTC.
+    - cron: '35 20 * * 1-5'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - intraday
+          - eod
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-intelligence-json
+  cancel-in-progress: true
+
+jobs:
+  generate-market-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas numpy pyyaml
+
+      - name: Determine requested mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            MODE="${{ inputs.mode }}"
+          else
+            # Scheduled runs use auto detection inside market_intelligence.py.
+            MODE="auto"
+          fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Requested mode: $MODE"
+
+      - name: Generate market intelligence JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Running market_intelligence.py..."
+          python market_intelligence.py --mode "${{ steps.mode.outputs.mode }}"
+
+          echo
+          echo "Files currently in watchlists/:"
+          ls -lah watchlists || true
+
+      - name: Validate generated JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # latest_market.json must exist whenever the script actually runs
+          # inside a valid market-intelligence window.
+          #
+          # For a scheduled run that lands outside the Python-detected window,
+          # the script exits cleanly without changing files. In that case,
+          # an existing last-good latest_market.json is acceptable.
+          if [[ ! -f watchlists/latest_market.json ]]; then
+            echo "ERROR: watchlists/latest_market.json does not exist."
+            exit 1
+          fi
+
+          python - << 'PY'
+          import json
+          from pathlib import Path
+
+          market_path = Path("watchlists/latest_market.json")
+
+          with market_path.open("r", encoding="utf-8") as f:
+              market = json.load(f)
+
+          required_market = {
+              "schema_version",
+              "generated_at_utc",
+              "market_mode",
+              "market_regime",
+              "benchmarks",
+              "breadth",
+              "sector_performance",
+              "key_market_metrics",
+          }
+
+          missing = required_market - set(market)
+
+          if missing:
+              raise SystemExit(
+                  f"latest_market.json missing keys: {sorted(missing)}"
+              )
+
+          if market.get("market_mode") == "eod":
+              universe_path = Path("watchlists/latest_universe.json")
+
+              if not universe_path.exists():
+                  raise SystemExit(
+                      "EOD run expected watchlists/latest_universe.json"
+                  )
+
+              with universe_path.open("r", encoding="utf-8") as f:
+                  universe = json.load(f)
+
+              required_universe = {
+                  "schema_version",
+                  "generated_at_utc",
+                  "market_date",
+                  "universe_size",
+                  "valid_ticker_count",
+                  "breadth",
+                  "stocks",
+              }
+
+              missing_universe = required_universe - set(universe)
+
+              if missing_universe:
+                  raise SystemExit(
+                      "latest_universe.json missing keys: "
+                      f"{sorted(missing_universe)}"
+                  )
+
+              if not isinstance(universe["stocks"], list):
+                  raise SystemExit(
+                      "latest_universe.json stocks must be a list"
+                  )
+
+              if universe["valid_ticker_count"] != len(universe["stocks"]):
+                  raise SystemExit(
+                      "latest_universe.json valid_ticker_count mismatch"
+                  )
+
+          print("JSON validation passed.")
+          PY
+
+      - name: Show JSON changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Git status:"
+          git status --short
+
+          echo
+          echo "Market intelligence JSON diff:"
+          git diff -- \
+            watchlists/latest_market.json \
+            watchlists/latest_universe.json || true
+
+      - name: Commit market intelligence JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # IMPORTANT:
+          # Only stage the two new market-intelligence outputs.
+          # Never touch the existing screener outputs:
+          # latest.json / latest_eod.json / latest_intraday.json.
+          git add -- \
+            watchlists/latest_market.json \
+            watchlists/latest_universe.json 2>/dev/null || true
+
+          echo "Staged changes:"
+          git diff --cached --name-status
+
+          if git diff --cached --quiet; then
+            echo "No market intelligence JSON changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update market intelligence JSON"
+
+          if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
+            echo "Initial push failed; rebasing and retrying."
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
