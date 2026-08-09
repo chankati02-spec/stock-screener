@@ -801,7 +801,14 @@ def build_market(
         )
     )
 
-    market_date = generated.astimezone(NY).date().isoformat()
+    # Use the latest completed benchmark trading session as market_date.
+    # This avoids weekend/holiday manual runs being stamped with a non-trading date.
+    market_date = max(
+        spy_perf["price_date"],
+        qqq_perf["price_date"],
+        sox_perf["price_date"],
+        vix_perf["price_date"],
+    )
 
     return {
         "schema_version": 1,
@@ -869,8 +876,34 @@ def build_market(
             },
         },
         "freshness": {
-            "status": "ok",
+            "status": (
+                "stale"
+                if mode == "intraday"
+                and timestamps
+                and (
+                    generated
+                    - pd.Timestamp(max(timestamps)).to_pydatetime().astimezone(UTC)
+                ).total_seconds() / 60.0 > 45
+                else "ok"
+            ),
             "benchmark_data_timestamp": data_timestamp,
+            "age_minutes": (
+                round(
+                    max(
+                        0.0,
+                        (
+                            generated
+                            - pd.Timestamp(max(timestamps))
+                            .to_pydatetime()
+                            .astimezone(UTC)
+                        ).total_seconds() / 60.0,
+                    ),
+                    1,
+                )
+                if timestamps
+                else None
+            ),
+            "stale_after_minutes": 45 if mode == "intraday" else None,
             "universe_coverage_pct": round(
                 available / len(universe) * 100.0,
                 2,
