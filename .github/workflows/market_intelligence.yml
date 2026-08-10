@@ -2,228 +2,715 @@ name: Market Intelligence JSON
 
 on:
   schedule:
-    # US regular session, every 30 minutes.
-    # These UTC times are correct during US daylight saving time (EDT):
-    # 13:35, 14:05, ... 19:35 UTC = 09:35, 10:05, ... 15:35 ET.
-    #
-    # IMPORTANT:
-    # GitHub Actions cron is UTC and does not automatically shift for DST.
-    # During US standard time (EST), move these schedules +1 hour.
-    - cron: '35 13 * * 1-5'
-    - cron: '5 14 * * 1-5'
-    - cron: '35 14 * * 1-5'
-    - cron: '5 15 * * 1-5'
-    - cron: '35 15 * * 1-5'
-    - cron: '5 16 * * 1-5'
-    - cron: '35 16 * * 1-5'
-    - cron: '5 17 * * 1-5'
-    - cron: '35 17 * * 1-5'
-    - cron: '5 18 * * 1-5'
-    - cron: '35 18 * * 1-5'
-    - cron: '5 19 * * 1-5'
-    - cron: '35 19 * * 1-5'
 
-    # EOD run after US close.
-    # 20:35 UTC = 16:35 ET during daylight saving time.
-    # During US standard time, move this to 21:35 UTC.
+    # ======================================================
+    # INTRADAY
+    #
+    # Run broad UTC windows covering BOTH EDT and EST.
+    #
+    # Python decides whether New York time is actually
+    # between 09:30 and 11:30.
+    #
+    # Therefore DST changes automatically.
+    # ======================================================
+
+    # 13:30–13:45 UTC
+    - cron: '30,45 13 * * 1-5'
+
+    # 14:00–14:45 UTC
+    - cron: '0,15,30,45 14 * * 1-5'
+
+    # 15:00–15:45 UTC
+    - cron: '0,15,30,45 15 * * 1-5'
+
+    # 16:00–16:30 UTC
+    - cron: '0,15,30 16 * * 1-5'
+
+
+    # ======================================================
+    # EOD
+    #
+    # EDT:
+    # 20:35 UTC = 16:35 New York
+    #
+    # EST:
+    # 21:35 UTC = 16:35 New York
+    #
+    # Python AUTO guard ignores whichever one is not valid.
+    # ======================================================
+
     - cron: '35 20 * * 1-5'
+    - cron: '35 21 * * 1-5'
+
 
   workflow_dispatch:
     inputs:
+
       mode:
         description: 'Run mode'
         required: true
         default: 'auto'
+
         type: choice
+
         options:
           - auto
           - intraday
           - eod
 
+
 permissions:
   contents: write
+
 
 concurrency:
   group: market-intelligence-json
   cancel-in-progress: true
 
+
 jobs:
+
   generate-market-intelligence:
+
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+
+    timeout-minutes: 40
+
 
     steps:
+
+      # ====================================================
+      # Checkout
+      # ====================================================
+
       - name: Checkout repository
+
         uses: actions/checkout@v4
+
         with:
           fetch-depth: 0
 
+
+      # ====================================================
+      # Python
+      # ====================================================
+
       - name: Set up Python
+
         uses: actions/setup-python@v5
+
         with:
           python-version: '3.11'
 
+
+      # ====================================================
+      # Dependencies
+      # ====================================================
+
       - name: Install dependencies
+
         run: |
+
           python -m pip install --upgrade pip
-          pip install yfinance pandas numpy pyyaml
+
+          pip install \
+            yfinance \
+            pandas \
+            numpy \
+            pyyaml
+
+
+      # ====================================================
+      # Determine requested mode
+      # ====================================================
 
       - name: Determine requested mode
+
         id: mode
+
         shell: bash
+
         run: |
+
           set -euo pipefail
+
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+
             MODE="${{ inputs.mode }}"
+
           else
-            # Scheduled runs use auto detection inside market_intelligence.py.
+
             MODE="auto"
+
           fi
+
 
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
           echo "Requested mode: $MODE"
 
+
+      # ====================================================
+      # Run Market Intelligence
+      # ====================================================
+
       - name: Generate market intelligence JSON
+
         shell: bash
+
         run: |
+
           set -euo pipefail
 
-          echo "Running market_intelligence.py..."
-          python market_intelligence.py --mode "${{ steps.mode.outputs.mode }}"
+
+          echo "Running market_intelligence.py"
+
+          python market_intelligence.py \
+            --mode "${{ steps.mode.outputs.mode }}"
+
 
           echo
-          echo "Files currently in watchlists/:"
+
+          echo "Watchlists directory:"
+
           ls -lah watchlists || true
 
+
+      # ====================================================
+      # Validate
+      # ====================================================
+
       - name: Validate generated JSON
+
         shell: bash
+
         run: |
+
           set -euo pipefail
 
-          # latest_market.json must exist whenever the script actually runs
-          # inside a valid market-intelligence window.
-          #
-          # For a scheduled run that lands outside the Python-detected window,
-          # the script exits cleanly without changing files. In that case,
-          # an existing last-good latest_market.json is acceptable.
-          if [[ ! -f watchlists/latest_market.json ]]; then
-            echo "ERROR: watchlists/latest_market.json does not exist."
-            exit 1
-          fi
 
-          python - << 'PY'
+          python << 'PY'
+
           import json
+
           from pathlib import Path
 
-          market_path = Path("watchlists/latest_market.json")
 
-          with market_path.open("r", encoding="utf-8") as f:
-              market = json.load(f)
+          market_path = Path(
+              "watchlists/latest_market.json"
+          )
 
-          required_market = {
-              "schema_version",
-              "generated_at_utc",
-              "market_mode",
-              "market_regime",
-              "benchmarks",
-              "breadth",
-              "sector_performance",
-              "key_market_metrics",
-          }
 
-          missing = required_market - set(market)
+          if not market_path.exists():
 
-          if missing:
-              raise SystemExit(
-                  f"latest_market.json missing keys: {sorted(missing)}"
+              print(
+                  "No latest_market.json was generated."
               )
 
-          if market.get("market_mode") == "eod":
-              universe_path = Path("watchlists/latest_universe.json")
+              print(
+                  "This is acceptable if AUTO ran "
+                  "outside a valid NY market window."
+              )
 
-              if not universe_path.exists():
+              raise SystemExit(0)
+
+
+          with market_path.open(
+              "r",
+              encoding="utf-8",
+          ) as f:
+
+              market = json.load(f)
+
+
+          required_market = {
+
+              "schema_version",
+
+              "generated_at_utc",
+
+              "market_date",
+
+              "market_mode",
+
+              "market_regime",
+
+              "benchmarks",
+
+              "breadth",
+
+              "sector_performance",
+
+              "key_market_metrics",
+
+          }
+
+
+          missing = (
+              required_market
+              - set(market)
+          )
+
+
+          if missing:
+
+              raise SystemExit(
+
+                  "latest_market.json "
+                  "missing keys: "
+                  f"{sorted(missing)}"
+
+              )
+
+
+          mode = market.get(
+              "market_mode"
+          )
+
+
+          print(
+              f"Detected generated mode: {mode}"
+          )
+
+
+          # ================================================
+          # EOD validation
+          # ================================================
+
+          if mode == "eod":
+
+              path = Path(
+                  "watchlists/"
+                  "latest_universe.json"
+              )
+
+
+              if not path.exists():
+
                   raise SystemExit(
-                      "EOD run expected watchlists/latest_universe.json"
+
+                      "EOD mode expected "
+                      "latest_universe.json"
+
                   )
 
-              with universe_path.open("r", encoding="utf-8") as f:
-                  universe = json.load(f)
 
-              required_universe = {
+              with path.open(
+                  "r",
+                  encoding="utf-8",
+              ) as f:
+
+                  data = json.load(f)
+
+
+              required = {
+
                   "schema_version",
+
                   "generated_at_utc",
+
                   "market_date",
+
                   "universe_size",
+
                   "valid_ticker_count",
+
                   "breadth",
+
                   "stocks",
+
               }
 
-              missing_universe = required_universe - set(universe)
 
-              if missing_universe:
+              missing = (
+                  required
+                  - set(data)
+              )
+
+
+              if missing:
+
                   raise SystemExit(
-                      "latest_universe.json missing keys: "
-                      f"{sorted(missing_universe)}"
+
+                      "latest_universe.json "
+                      "missing keys: "
+                      f"{sorted(missing)}"
+
                   )
 
-              if not isinstance(universe["stocks"], list):
+
+              if not isinstance(
+                  data["stocks"],
+                  list,
+              ):
+
                   raise SystemExit(
-                      "latest_universe.json stocks must be a list"
+
+                      "latest_universe.json "
+                      "stocks must be list"
+
                   )
 
-              if universe["valid_ticker_count"] != len(universe["stocks"]):
+
+              if (
+                  data[
+                      "valid_ticker_count"
+                  ]
+                  != len(
+                      data["stocks"]
+                  )
+              ):
+
                   raise SystemExit(
-                      "latest_universe.json valid_ticker_count mismatch"
+
+                      "latest_universe.json "
+                      "ticker count mismatch"
+
                   )
 
-          print("JSON validation passed.")
+
+              coverage = (
+
+                  data[
+                      "valid_ticker_count"
+                  ]
+                  / max(
+                      data[
+                          "universe_size"
+                      ],
+                      1,
+                  )
+
+              )
+
+
+              if coverage < 0.80:
+
+                  raise SystemExit(
+
+                      "EOD universe coverage "
+                      f"too low: "
+                      f"{coverage:.1%}"
+
+                  )
+
+
+              print(
+
+                  "EOD universe validation passed."
+
+              )
+
+
+          # ================================================
+          # Intraday validation
+          # ================================================
+
+          elif mode == "intraday":
+
+              path = Path(
+
+                  "watchlists/"
+                  "latest_intraday_universe.json"
+
+              )
+
+
+              if not path.exists():
+
+                  raise SystemExit(
+
+                      "Intraday mode expected "
+                      "latest_intraday_universe.json"
+
+                  )
+
+
+              with path.open(
+                  "r",
+                  encoding="utf-8",
+              ) as f:
+
+                  data = json.load(f)
+
+
+              required = {
+
+                  "schema_version",
+
+                  "generated_at_utc",
+
+                  "market_date",
+
+                  "data_timestamp",
+
+                  "universe_size",
+
+                  "valid_ticker_count",
+
+                  "breadth",
+
+                  "stocks",
+
+              }
+
+
+              missing = (
+                  required
+                  - set(data)
+              )
+
+
+              if missing:
+
+                  raise SystemExit(
+
+                      "latest_intraday_universe.json "
+                      "missing keys: "
+                      f"{sorted(missing)}"
+
+                  )
+
+
+              if not isinstance(
+                  data["stocks"],
+                  list,
+              ):
+
+                  raise SystemExit(
+
+                      "latest_intraday_universe.json "
+                      "stocks must be list"
+
+                  )
+
+
+              if (
+                  data[
+                      "valid_ticker_count"
+                  ]
+                  != len(
+                      data["stocks"]
+                  )
+              ):
+
+                  raise SystemExit(
+
+                      "Intraday universe "
+                      "ticker count mismatch"
+
+                  )
+
+
+              coverage = (
+
+                  data[
+                      "valid_ticker_count"
+                  ]
+                  / max(
+                      data[
+                          "universe_size"
+                      ],
+                      1,
+                  )
+
+              )
+
+
+              if coverage < 0.65:
+
+                  raise SystemExit(
+
+                      "Intraday universe coverage "
+                      f"too low: "
+                      f"{coverage:.1%}"
+
+                  )
+
+
+              breadth = data.get(
+                  "breadth",
+                  {},
+              )
+
+
+              expected_breadth = {
+
+                  "positive_day_pct",
+
+                  "above_vwap_pct",
+
+                  "ema9_above_ema20_pct",
+
+                  "breakout_count",
+
+                  "near_breakout_count",
+
+                  "high_rvol_count",
+
+              }
+
+
+              missing_breadth = (
+
+                  expected_breadth
+                  - set(breadth)
+
+              )
+
+
+              if missing_breadth:
+
+                  raise SystemExit(
+
+                      "Intraday breadth "
+                      "missing keys: "
+                      f"{sorted(missing_breadth)}"
+
+                  )
+
+
+              print(
+
+                  "Intraday universe "
+                  "validation passed."
+
+              )
+
+
+          print(
+              "JSON validation passed."
+          )
+
           PY
 
+
+      # ====================================================
+      # Show changes
+      # ====================================================
+
       - name: Show JSON changes
+
         shell: bash
+
         run: |
+
           set -euo pipefail
+
 
           echo "Git status:"
+
           git status --short
 
+
           echo
+
           echo "Market intelligence JSON diff:"
+
+
           git diff -- \
+
             watchlists/latest_market.json \
-            watchlists/latest_universe.json || true
+
+            watchlists/latest_universe.json \
+
+            watchlists/latest_intraday_universe.json \
+
+            || true
+
+
+      # ====================================================
+      # Commit ONLY Market Intelligence outputs
+      # ====================================================
 
       - name: Commit market intelligence JSON
+
         shell: bash
+
         run: |
+
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email \
+
+          git config \
+            user.name \
+            "github-actions[bot]"
+
+
+          git config \
+            user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # IMPORTANT:
-          # Only stage the two new market-intelligence outputs.
-          # Never touch the existing screener outputs:
-          # latest.json / latest_eod.json / latest_intraday.json.
+
+          # ------------------------------------------------
+          # IMPORTANT
+          #
+          # Do NOT stage:
+          # latest.json
+          # latest_eod.json
+          # latest_intraday.json
+          #
+          # Existing screener remains independent.
+          # ------------------------------------------------
+
+
           git add -- \
+
             watchlists/latest_market.json \
-            watchlists/latest_universe.json 2>/dev/null || true
+
+            watchlists/latest_universe.json \
+
+            watchlists/latest_intraday_universe.json \
+
+            2>/dev/null || true
+
 
           echo "Staged changes:"
-          git diff --cached --name-status
 
-          if git diff --cached --quiet; then
-            echo "No market intelligence JSON changes to commit."
+          git diff \
+            --cached \
+            --name-status
+
+
+          if git diff \
+            --cached \
+            --quiet
+
+          then
+
+            echo \
+              "No Market Intelligence changes."
+
             exit 0
+
           fi
 
-          git commit -m "Update market intelligence JSON"
 
-          if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
-            echo "Initial push failed; rebasing and retrying."
-            git pull --rebase origin "${GITHUB_REF_NAME}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+          git commit \
+            -m \
+            "Update market intelligence JSON"
+
+
+          if ! git push \
+            origin \
+            "HEAD:${GITHUB_REF_NAME}"
+
+          then
+
+            echo \
+              "Initial push failed; "
+              "rebasing and retrying."
+
+
+            git pull \
+              --rebase \
+              origin \
+              "${GITHUB_REF_NAME}"
+
+
+            git push \
+              origin \
+              "HEAD:${GITHUB_REF_NAME}"
+
           fi
