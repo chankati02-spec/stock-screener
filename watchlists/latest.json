@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-13T15:12:27Z",
-  "generated_at_hk": "2026-08-13T23:12:27+08:00",
+  "generated_at_utc": "2026-08-13T15:36:55Z",
+  "generated_at_hk": "2026-08-13T23:36:55+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-08-13",
@@ -11,25 +11,25 @@
   "other_skipped": 418,
   "stocks": [
     {
-      "ticker": "SMCI",
+      "ticker": "SNDK",
       "mode": "INTRADAY",
-      "setup_type": "Intraday EP Rocket",
-      "price": 41.72,
-      "prev_close": 37.61,
-      "prev_high": 38.15,
-      "opening_range_high": 40.08,
-      "day_change": 10.93,
-      "raw_rvol": 1.1,
-      "adjusted_rvol": 4.2,
-      "turnover_m": 2581.94,
-      "adr_20": 6.94,
-      "vwap": 40.63,
-      "ema9": 41.65,
-      "ema20": 41.08,
+      "setup_type": "Intraday Breakout",
+      "price": 1522.01,
+      "prev_close": 1344.29,
+      "prev_high": 1389.28,
+      "opening_range_high": 1414.99,
+      "day_change": 13.22,
+      "raw_rvol": 0.68,
+      "adjusted_rvol": 2.08,
+      "turnover_m": 17045.89,
+      "adr_20": 10.37,
+      "vwap": 1455.52,
+      "ema9": 1504.55,
+      "ema20": 1462.66,
       "above_vwap": true,
       "ema9_above_ema20": true,
       "score": 100,
-      "data_time": "2026-08-13 11:10:00-04:00"
+      "data_time": "2026-08-13 11:35:00-04:00"
     }
   ]
 }
