@@ -1,13 +1,35 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-13T16:09:25Z",
-  "generated_at_hk": "2026-08-14T00:09:25+08:00",
+  "generated_at_utc": "2026-08-14T13:44:46Z",
+  "generated_at_hk": "2026-08-14T21:44:46+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-08-13",
-  "selected_count": 0,
-  "published_count": 0,
+  "market_date": "2026-08-14",
+  "selected_count": 1,
+  "published_count": 1,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": []
+  "other_skipped": 418,
+  "stocks": [
+    {
+      "ticker": "LUNR",
+      "mode": "INTRADAY",
+      "setup_type": "Intraday EP Rocket",
+      "price": 19.66,
+      "prev_close": 17.56,
+      "prev_high": 17.68,
+      "opening_range_high": 20.47,
+      "day_change": 11.95,
+      "raw_rvol": 0.44,
+      "adjusted_rvol": 11.71,
+      "turnover_m": 86.95,
+      "adr_20": 8.2,
+      "vwap": 19.59,
+      "ema9": 19.42,
+      "ema20": 19.35,
+      "above_vwap": true,
+      "ema9_above_ema20": true,
+      "score": 100,
+      "data_time": "2026-08-14 09:40:00-04:00"
+    }
+  ]
 }
