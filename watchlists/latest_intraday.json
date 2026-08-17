@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-17T14:59:05Z",
-  "generated_at_hk": "2026-08-17T22:59:05+08:00",
+  "generated_at_utc": "2026-08-17T15:39:21Z",
+  "generated_at_hk": "2026-08-17T23:39:21+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-08-17",
-  "selected_count": 1,
-  "published_count": 1,
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 418,
-  "stocks": [
-    {
-      "ticker": "SNDK",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday Breakout",
-      "price": 1810.0,
-      "prev_close": 1641.11,
-      "prev_high": 1667.19,
-      "opening_range_high": 1782.48,
-      "day_change": 10.29,
-      "raw_rvol": 0.51,
-      "adjusted_rvol": 2.22,
-      "turnover_m": 15416.15,
-      "adr_20": 10.27,
-      "vwap": 1758.09,
-      "ema9": 1793.45,
-      "ema20": 1774.33,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 100,
-      "data_time": "2026-08-17 10:55:00-04:00"
-    }
-  ]
+  "other_skipped": 419,
+  "stocks": []
 }
