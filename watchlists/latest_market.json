@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-08-19T20:56:14Z",
-  "generated_at_hk": "2026-08-20T04:56:14+08:00",
+  "generated_at_utc": "2026-08-19T21:53:00Z",
+  "generated_at_hk": "2026-08-20T05:53:00+08:00",
   "market_date": "2026-08-19",
   "market_mode": "eod",
   "mode": "MARKET_EOD",
@@ -39,8 +39,8 @@
       "previous_close": 11992.46,
       "change_1d_pct": -2.12,
       "return_5d_pct": -5.332,
-      "return_1m_pct": -5.001,
-      "return_63d_pct": 3.828,
+      "return_1m_pct": -1.089,
+      "return_63d_pct": -2.779,
       "price_date": "2026-08-19"
     },
     "VIX": {
@@ -48,8 +48,8 @@
       "previous_close": 15.84,
       "change_1d_pct": -5.997,
       "return_5d_pct": 2.337,
-      "return_1m_pct": -12.669,
-      "return_63d_pct": -14.622,
+      "return_1m_pct": -10.998,
+      "return_63d_pct": -19.208,
       "price_date": "2026-08-19"
     }
   },
