@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-20T14:20:59Z",
-  "generated_at_hk": "2026-08-20T22:20:59+08:00",
+  "generated_at_utc": "2026-08-20T14:51:49Z",
+  "generated_at_hk": "2026-08-20T22:51:49+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-08-20",
@@ -11,25 +11,25 @@
   "other_skipped": 418,
   "stocks": [
     {
-      "ticker": "MARA",
+      "ticker": "DE",
       "mode": "INTRADAY",
       "setup_type": "Intraday EP Rocket",
-      "price": 10.48,
-      "prev_close": 9.65,
-      "prev_high": 9.89,
-      "opening_range_high": 10.71,
-      "day_change": 8.6,
-      "raw_rvol": 0.49,
-      "adjusted_rvol": 3.74,
-      "turnover_m": 225.92,
-      "adr_20": 7.87,
-      "vwap": 10.38,
-      "ema9": 10.45,
-      "ema20": 10.35,
+      "price": 628.66,
+      "prev_close": 580.63,
+      "prev_high": 596.06,
+      "opening_range_high": 611.12,
+      "day_change": 8.27,
+      "raw_rvol": 0.82,
+      "adjusted_rvol": 3.93,
+      "turnover_m": 550.58,
+      "adr_20": 2.46,
+      "vwap": 611.91,
+      "ema9": 619.62,
+      "ema20": 613.12,
       "above_vwap": true,
       "ema9_above_ema20": true,
-      "score": 96.4,
-      "data_time": "2026-08-20 10:20:00-04:00"
+      "score": 96.01,
+      "data_time": "2026-08-20 10:50:00-04:00"
     }
   ]
 }
