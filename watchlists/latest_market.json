@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-08-21T21:51:48Z",
-  "generated_at_hk": "2026-08-22T05:51:48+08:00",
+  "generated_at_utc": "2026-08-24T00:53:32Z",
+  "generated_at_hk": "2026-08-24T08:53:32+08:00",
   "market_date": "2026-08-21",
   "market_mode": "eod",
   "mode": "MARKET_EOD",
@@ -34,9 +34,9 @@
       "price_date": "2026-08-21"
     },
     "^SOX": {
-      "last_price": 11740.374,
+      "last_price": 11740.3701,
       "previous_close": 11800.0195,
-      "change_1d_pct": -0.505,
+      "change_1d_pct": -0.506,
       "return_5d_pct": -5.45,
       "return_1m_pct": -4.889,
       "return_63d_pct": -1.87,
@@ -171,8 +171,8 @@
     }
   },
   "coverage": {
-    "configured_universe": 419,
-    "daily_available": 419,
+    "configured_universe": 420,
+    "daily_available": 420,
     "intraday_available": null
   }
 }
