@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-24T14:26:39Z",
-  "generated_at_hk": "2026-08-24T22:26:39+08:00",
+  "generated_at_utc": "2026-08-24T14:56:29Z",
+  "generated_at_hk": "2026-08-24T22:56:29+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-08-24",
-  "selected_count": 1,
-  "published_count": 1,
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "MSTR",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday Breakout",
-      "price": 125.1,
-      "prev_close": 119.25,
-      "prev_high": 121.91,
-      "opening_range_high": 122.9,
-      "day_change": 4.91,
-      "raw_rvol": 0.74,
-      "adjusted_rvol": 5.07,
-      "turnover_m": 1923.13,
-      "adr_20": 5.37,
-      "vwap": 122.15,
-      "ema9": 123.61,
-      "ema20": 122.65,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 88.37,
-      "data_time": "2026-08-24 10:25:00-04:00"
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
