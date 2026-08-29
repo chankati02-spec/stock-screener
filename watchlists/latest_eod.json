@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-29T00:01:05Z",
-  "generated_at_hk": "2026-08-29T08:01:05+08:00",
+  "generated_at_utc": "2026-08-29T00:05:49Z",
+  "generated_at_hk": "2026-08-29T08:05:49+08:00",
   "mode": "EOD",
   "mode_name": "盤後 Setup 模式",
   "market_date": "2026-08-28",
@@ -370,7 +370,7 @@
       "buy_signal": 57.0,
       "momentum_score": 48.0,
       "consolidation_score": 58.0,
-      "adr_20": 3.02,
+      "adr_20": 3.01,
       "avg_dollar_volume_m": 205.39,
       "ret_1m": 21.68,
       "ret_3m": 10.13,
