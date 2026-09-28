@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-09-28T20:25:42Z",
-  "generated_at_hk": "2026-09-29T04:25:42+08:00",
+  "generated_at_utc": "2026-09-28T21:03:07Z",
+  "generated_at_hk": "2026-09-29T05:03:07+08:00",
   "market_date": "2026-09-28",
   "market_mode": "eod",
   "mode": "MARKET_EOD",
@@ -89,7 +89,7 @@
       {
         "sector": "Financials",
         "ticker": "XLF",
-        "change_1d_pct": -1.167
+        "change_1d_pct": -1.185
       }
     ],
     "all": [
@@ -136,7 +136,7 @@
       {
         "sector": "Financials",
         "ticker": "XLF",
-        "change_1d_pct": -1.167
+        "change_1d_pct": -1.185
       },
       {
         "sector": "Consumer Discretionary",
