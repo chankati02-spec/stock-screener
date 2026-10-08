@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-10-08T20:28:58Z",
-  "generated_at_hk": "2026-10-09T04:28:58+08:00",
+  "generated_at_utc": "2026-10-08T20:55:00Z",
+  "generated_at_hk": "2026-10-09T04:55:00+08:00",
   "market_date": "2026-10-08",
   "market_mode": "eod",
   "mode": "MARKET_EOD",
@@ -17,12 +17,12 @@
   },
   "benchmarks": {
     "SPY": {
-      "last_price": 773.97,
+      "last_price": 773.93,
       "previous_close": 777.22,
-      "change_1d_pct": -0.418,
-      "return_5d_pct": 1.306,
-      "return_1m_pct": 1.518,
-      "return_63d_pct": 2.519,
+      "change_1d_pct": -0.423,
+      "return_5d_pct": 1.301,
+      "return_1m_pct": 1.512,
+      "return_63d_pct": 2.514,
       "price_date": "2026-10-08"
     },
     "QQQ": {
@@ -44,12 +44,12 @@
       "price_date": "2026-10-08"
     },
     "VIX": {
-      "last_price": 15.43,
+      "last_price": 15.41,
       "previous_close": 15.08,
-      "change_1d_pct": 2.321,
-      "return_5d_pct": -5.857,
-      "return_1m_pct": -6.258,
-      "return_63d_pct": -10.082,
+      "change_1d_pct": 2.188,
+      "return_5d_pct": -5.979,
+      "return_1m_pct": -6.379,
+      "return_63d_pct": -10.198,
       "price_date": "2026-10-08"
     }
   },
@@ -131,7 +131,7 @@
       {
         "sector": "Consumer Discretionary",
         "ticker": "XLY",
-        "change_1d_pct": 0.305
+        "change_1d_pct": 0.314
       },
       {
         "sector": "Utilities",
@@ -167,8 +167,8 @@
       "above_200ma": true
     },
     "VIX": {
-      "level": 15.43,
-      "change_1d_pct": 2.321
+      "level": 15.41,
+      "change_1d_pct": 2.188
     }
   },
   "coverage": {
