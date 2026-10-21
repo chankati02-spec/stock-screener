@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-21T19:17:03Z",
-  "generated_at_hk": "2026-10-22T03:17:03+08:00",
+  "generated_at_utc": "2026-10-21T19:35:20Z",
+  "generated_at_hk": "2026-10-22T03:35:20+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-10-21",
@@ -14,22 +14,22 @@
       "ticker": "CRL",
       "mode": "INTRADAY",
       "setup_type": "Intraday Breakout",
-      "price": 343.95,
+      "price": 347.62,
       "prev_close": 315.45,
       "prev_high": 317.59,
       "opening_range_high": 331.61,
-      "day_change": 9.03,
-      "raw_rvol": 1.91,
-      "adjusted_rvol": 2.15,
-      "turnover_m": 643.88,
+      "day_change": 10.2,
+      "raw_rvol": 2.61,
+      "adjusted_rvol": 2.78,
+      "turnover_m": 887.69,
       "adr_20": 4.05,
-      "vwap": 338.0,
-      "ema9": 343.35,
-      "ema20": 343.19,
+      "vwap": 338.23,
+      "ema9": 345.31,
+      "ema20": 344.3,
       "above_vwap": true,
       "ema9_above_ema20": true,
-      "score": 93.72,
-      "data_time": "2026-10-21 15:15:00-04:00"
+      "score": 100,
+      "data_time": "2026-10-21 15:35:00-04:00"
     }
   ]
 }
