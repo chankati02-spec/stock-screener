@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-26T16:04:49Z",
-  "generated_at_hk": "2026-08-27T00:04:49+08:00",
+  "generated_at_utc": "2026-10-21T11:27:54Z",
+  "generated_at_hk": "2026-10-21T19:27:54+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-08-26",
-  "selected_count": 1,
-  "published_count": 1,
+  "market_date": "2026-10-21",
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "ANF",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday EP Rocket",
-      "price": 153.46,
-      "prev_close": 108.9,
-      "prev_high": 112.89,
-      "opening_range_high": 142.52,
-      "day_change": 40.91,
-      "raw_rvol": 11.08,
-      "adjusted_rvol": 27.91,
-      "turnover_m": 1793.34,
-      "adr_20": 4.16,
-      "vwap": 144.86,
-      "ema9": 151.55,
-      "ema20": 149.16,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 100,
-      "data_time": "2026-08-26 12:00:00-04:00"
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
