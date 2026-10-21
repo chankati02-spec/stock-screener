@@ -16,6 +16,15 @@ on:
 
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Run mode for manual dispatch'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - intraday
+          - eod
       force_full_refresh:
         description: 'Force refresh all fundamentals (ignore cache)'
         required: false
@@ -53,6 +62,8 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TRIGGER_SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_MODE: ${{ inputs.mode || 'auto' }}
         run: |
           python3 << 'PYTHON_SCRIPT'
           import os
@@ -82,15 +93,38 @@ jobs:
           # 因為盤後只用 daily completed candle，不需要精準時間
           EOD_START = 5 * 60 + 20
 
-          IS_INTRADAY_MODE = (
-              hk_minutes >= INTRADAY_START
-              or hk_minutes <= INTRADAY_END_AFTER_MIDNIGHT
-          )
+          trigger_schedule = os.getenv("TRIGGER_SCHEDULE", "").strip()
+          manual_mode = os.getenv("MANUAL_MODE", "auto").strip().lower()
 
-          IS_EOD_MODE = (
-              hk_minutes >= EOD_START
-              and not IS_INTRADAY_MODE
-          )
+          intraday_schedules = {
+              "45 13 * * 1-5",
+              "15 14 * * 1-5",
+              "45 14 * * 1-5",
+              "15 15 * * 1-5",
+              "45 15 * * 1-5",
+          }
+          eod_schedules = {
+              "37 21 * * 1-5",
+              "12 22 * * 1-5",
+          }
+
+          # Scheduled jobs can start hours late. Select the mode from the
+          # cron expression that triggered the run, not the runner start time.
+          if manual_mode in {"intraday", "eod"}:
+              IS_INTRADAY_MODE = manual_mode == "intraday"
+              IS_EOD_MODE = manual_mode == "eod"
+          elif trigger_schedule:
+              IS_INTRADAY_MODE = trigger_schedule in intraday_schedules
+              IS_EOD_MODE = trigger_schedule in eod_schedules
+          else:
+              IS_INTRADAY_MODE = (
+                  hk_minutes >= INTRADAY_START
+                  or hk_minutes <= INTRADAY_END_AFTER_MIDNIGHT
+              )
+              IS_EOD_MODE = (
+                  hk_minutes >= EOD_START
+                  and not IS_INTRADAY_MODE
+              )
 
           if not IS_INTRADAY_MODE and not IS_EOD_MODE:
               print(f"Outside allowed HK run window. HK time = {hk_now.strftime('%Y-%m-%d %H:%M')}. No Telegram sent.")
