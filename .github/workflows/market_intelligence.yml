@@ -72,9 +72,13 @@ jobs:
 
             # Scheduled jobs can start hours late. Use the cron expression
             # that triggered the run instead of the runner start time.
-            if [[ "$SCHEDULE" == "30,45 13 * * 1-5" \n               || "$SCHEDULE" == "0,15,30,45 14 * * 1-5" \n               || "$SCHEDULE" == "0,15,30,45 15 * * 1-5" \n               || "$SCHEDULE" == "0,15,30 16 * * 1-5" ]]; then
+            if [[ "$SCHEDULE" == "30,45 13 * * 1-5" ]] ||
+               [[ "$SCHEDULE" == "0,15,30,45 14 * * 1-5" ]] ||
+               [[ "$SCHEDULE" == "0,15,30,45 15 * * 1-5" ]] ||
+               [[ "$SCHEDULE" == "0,15,30 16 * * 1-5" ]]; then
               MODE="intraday"
-            elif [[ "$SCHEDULE" == "35 20 * * 1-5" \n                 || "$SCHEDULE" == "35 21 * * 1-5" ]]; then
+            elif [[ "$SCHEDULE" == "35 20 * * 1-5" ]] ||
+                 [[ "$SCHEDULE" == "35 21 * * 1-5" ]]; then
               MODE="eod"
             else
               MODE="auto"
