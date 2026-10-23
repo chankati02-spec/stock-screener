@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-23T17:57:50Z",
-  "generated_at_hk": "2026-10-24T01:57:50+08:00",
+  "generated_at_utc": "2026-10-23T18:20:33Z",
+  "generated_at_hk": "2026-10-24T02:20:33+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-10-23",
-  "selected_count": 1,
-  "published_count": 1,
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "CBOE",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday Breakout",
-      "price": 339.4,
-      "prev_close": 327.72,
-      "prev_high": 330.56,
-      "opening_range_high": 337.68,
-      "day_change": 3.56,
-      "raw_rvol": 1.83,
-      "adjusted_rvol": 2.66,
-      "turnover_m": 830.32,
-      "adr_20": 4.04,
-      "vwap": 338.41,
-      "ema9": 338.7,
-      "ema20": 338.7,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 76.91,
-      "data_time": "2026-10-23 13:55:00-04:00"
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
