@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-10-26T20:18:12Z",
-  "generated_at_hk": "2026-10-27T04:18:12+08:00",
+  "generated_at_utc": "2026-10-26T20:48:14Z",
+  "generated_at_hk": "2026-10-27T04:48:14+08:00",
   "market_date": "2026-10-26",
   "market_mode": "intraday",
   "mode": "MARKET_INTRADAY",
@@ -47,14 +47,14 @@
       "data_timestamp": "2026-10-26 15:55:00-04:00"
     },
     "VIX": {
-      "last_price": 18.49,
+      "last_price": 18.39,
       "previous_close": 19.45,
-      "change_1d_pct": -4.936,
+      "change_1d_pct": -5.45,
       "return_5d_pct": -2.701,
       "return_1m_pct": 24.123,
       "return_63d_pct": 6.809,
       "price_date": "2026-10-23",
-      "data_timestamp": "2026-10-26 16:00:00-04:00"
+      "data_timestamp": "2026-10-26 16:10:00-04:00"
     }
   },
   "breadth": {
@@ -177,8 +177,8 @@
       "above_200ma": true
     },
     "VIX": {
-      "level": 18.49,
-      "change_1d_pct": -4.936
+      "level": 18.39,
+      "change_1d_pct": -5.45
     }
   },
   "coverage": {
