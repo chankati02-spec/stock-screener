@@ -1,39 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-24T00:41:55Z",
-  "generated_at_hk": "2026-10-24T08:41:55+08:00",
-  "mode": "EOD",
-  "mode_name": "盤後 Setup 模式",
-  "market_date": "2026-10-22",
-  "selected_count": 1,
-  "published_count": 1,
+  "generated_at_utc": "2026-10-26T19:33:23Z",
+  "generated_at_hk": "2026-10-27T03:33:23+08:00",
+  "mode": "INTRADAY",
+  "mode_name": "盤中 EP / BO 模式",
+  "market_date": "2026-10-26",
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "CCL",
-      "mode": "EOD",
-      "setup_type": "Base Breakout Watch",
-      "price": 27.08,
-      "price_date": "2026-10-22",
-      "age_days": 2,
-      "buy_signal": 50.6,
-      "momentum_score": 42.0,
-      "consolidation_score": 51.0,
-      "adr_20": 3.3,
-      "avg_dollar_volume_m": 611.82,
-      "ret_1m": 24.28,
-      "ret_3m": -0.15,
-      "ret_6m": -0.33,
-      "distance_52w": 20.42,
-      "range_10_pct": 7.92,
-      "pivot": 27.8,
-      "stop": 25.76,
-      "risk_pct": 7.34,
-      "sma_50": 24.79,
-      "sma_200": 27.19,
-      "reason": "Base Breakout Watch；ADR 3.3%；1M 24.3%；3M -0.1%；距52W高 20.4%；10日range 7.9%；risk 7.3%；Base ADR區間 2.5-4.0%；縮量整理",
-      "setup_rank": 3
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
