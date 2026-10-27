@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-27T18:57:57Z",
-  "generated_at_hk": "2026-10-28T02:57:57+08:00",
+  "generated_at_utc": "2026-10-27T19:26:18Z",
+  "generated_at_hk": "2026-10-28T03:26:18+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-10-27",
@@ -14,22 +14,22 @@
       "ticker": "SOFI",
       "mode": "INTRADAY",
       "setup_type": "Intraday EP Rocket",
-      "price": 16.51,
+      "price": 16.49,
       "prev_close": 14.46,
       "prev_high": 14.67,
       "opening_range_high": 16.28,
-      "day_change": 14.21,
-      "raw_rvol": 3.09,
-      "adjusted_rvol": 3.67,
-      "turnover_m": 2274.18,
+      "day_change": 14.0,
+      "raw_rvol": 3.19,
+      "adjusted_rvol": 3.49,
+      "turnover_m": 2343.28,
       "adr_20": 3.69,
       "vwap": 16.27,
-      "ema9": 16.43,
-      "ema20": 16.44,
+      "ema9": 16.48,
+      "ema20": 16.47,
       "above_vwap": true,
-      "ema9_above_ema20": false,
+      "ema9_above_ema20": true,
       "score": 100,
-      "data_time": "2026-10-27 14:55:00-04:00"
+      "data_time": "2026-10-27 15:25:00-04:00"
     }
   ]
 }
