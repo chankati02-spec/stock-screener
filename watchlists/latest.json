@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-26T20:45:02Z",
-  "generated_at_hk": "2026-10-27T04:45:02+08:00",
-  "mode": "INTRADAY",
-  "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-10-26",
+  "generated_at_utc": "2026-10-27T00:43:34Z",
+  "generated_at_hk": "2026-10-27T08:43:34+08:00",
+  "mode": "EOD",
+  "mode_name": "盤後 Setup 模式",
+  "market_date": "2026-10-27",
   "selected_count": 0,
   "published_count": 0,
-  "stale_skipped": 0,
-  "other_skipped": 420,
+  "stale_skipped": 402,
+  "other_skipped": 18,
   "stocks": []
 }
