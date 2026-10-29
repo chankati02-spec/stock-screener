@@ -1,13 +1,35 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-29T19:12:29Z",
-  "generated_at_hk": "2026-10-30T03:12:29+08:00",
+  "generated_at_utc": "2026-10-29T19:38:03Z",
+  "generated_at_hk": "2026-10-30T03:38:03+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-10-29",
-  "selected_count": 0,
-  "published_count": 0,
+  "selected_count": 1,
+  "published_count": 1,
   "stale_skipped": 0,
-  "other_skipped": 420,
-  "stocks": []
+  "other_skipped": 419,
+  "stocks": [
+    {
+      "ticker": "HII",
+      "mode": "INTRADAY",
+      "setup_type": "Intraday EP Rocket",
+      "price": 317.34,
+      "prev_close": 279.26,
+      "prev_high": 282.11,
+      "opening_range_high": 327.75,
+      "day_change": 13.64,
+      "raw_rvol": 4.39,
+      "adjusted_rvol": 4.65,
+      "turnover_m": 741.85,
+      "adr_20": 2.5,
+      "vwap": 312.66,
+      "ema9": 316.2,
+      "ema20": 315.55,
+      "above_vwap": true,
+      "ema9_above_ema20": true,
+      "score": 95.01,
+      "data_time": "2026-10-29 15:35:00-04:00"
+    }
+  ]
 }
