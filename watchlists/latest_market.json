@@ -1,151 +1,162 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-11-03T03:02:16Z",
-  "generated_at_hk": "2026-11-03T11:02:16+08:00",
-  "market_date": "2026-11-02",
-  "market_mode": "eod",
-  "mode": "MARKET_EOD",
+  "generated_at_utc": "2026-11-03T20:12:01Z",
+  "generated_at_hk": "2026-11-04T04:12:01+08:00",
+  "market_date": "2026-11-03",
+  "market_mode": "intraday",
+  "mode": "MARKET_INTRADAY",
   "market_regime": {
     "state": "Risk-off",
-    "confidence": 80,
+    "confidence": 90,
     "reasons": [
       "SPY below 20/50MA",
       "QQQ below 20/50MA",
-      "SOX below 20/50MA"
+      "SOX below 20/50MA",
+      "majority below VWAP"
     ]
   },
   "benchmarks": {
     "SPY": {
-      "last_price": 752.1,
-      "previous_close": 755.72,
-      "change_1d_pct": -0.479,
+      "last_price": 754.205,
+      "previous_close": 752.1,
+      "change_1d_pct": 0.28,
       "return_5d_pct": -1.734,
       "return_1m_pct": -2.279,
       "return_63d_pct": -2.493,
-      "price_date": "2026-11-02"
+      "price_date": "2026-11-02",
+      "data_timestamp": "2026-11-03 15:10:00-05:00"
     },
     "QQQ": {
-      "last_price": 681.09,
-      "previous_close": 690.49,
-      "change_1d_pct": -1.361,
+      "last_price": 684.96,
+      "previous_close": 681.09,
+      "change_1d_pct": 0.568,
       "return_5d_pct": -4.368,
       "return_1m_pct": -9.137,
       "return_63d_pct": -5.907,
-      "price_date": "2026-11-02"
+      "price_date": "2026-11-02",
+      "data_timestamp": "2026-11-03 15:10:00-05:00"
     },
     "^SOX": {
-      "last_price": 10328.3291,
-      "previous_close": 10688.7998,
-      "change_1d_pct": -3.372,
+      "last_price": 10575.1875,
+      "previous_close": 10328.3301,
+      "change_1d_pct": 2.39,
       "return_5d_pct": -6.813,
       "return_1m_pct": -21.378,
       "return_63d_pct": -15.197,
-      "price_date": "2026-11-02"
+      "price_date": "2026-11-02",
+      "data_timestamp": "2026-11-03 15:10:00-05:00"
     },
     "VIX": {
-      "last_price": 21.15,
-      "previous_close": 19.42,
-      "change_1d_pct": 8.908,
+      "last_price": 21.03,
+      "previous_close": 21.15,
+      "change_1d_pct": -0.567,
       "return_5d_pct": 15.008,
       "return_1m_pct": 38.145,
       "return_63d_pct": 33.776,
-      "price_date": "2026-11-02"
+      "price_date": "2026-11-02",
+      "data_timestamp": "2026-11-03 14:55:00-05:00"
     }
   },
   "breadth": {
-    "positive_day_pct": null,
-    "above_vwap_pct": null
+    "valid_tickers": 402,
+    "positive_day_pct": 41.79,
+    "above_vwap_pct": 31.09,
+    "ema9_above_ema20_pct": 18.41,
+    "breakout_count": 39,
+    "opening_range_breakout_count": 75,
+    "near_breakout_count": 27,
+    "high_rvol_count": 23
   },
   "sector_performance": {
     "top_3": [
       {
-        "sector": "Consumer Discretionary",
-        "ticker": "XLY",
-        "change_1d_pct": 2.409
-      },
-      {
-        "sector": "Financials",
-        "ticker": "XLF",
-        "change_1d_pct": 1.858
-      },
-      {
-        "sector": "Materials",
-        "ticker": "XLB",
-        "change_1d_pct": 1.763
-      }
-    ],
-    "bottom_3": [
-      {
-        "sector": "Energy",
-        "ticker": "XLE",
-        "change_1d_pct": -3.956
-      },
-      {
         "sector": "Technology",
         "ticker": "XLK",
-        "change_1d_pct": -2.947
-      },
-      {
-        "sector": "Health Care",
-        "ticker": "XLV",
-        "change_1d_pct": -0.146
-      }
-    ],
-    "all": [
-      {
-        "sector": "Consumer Discretionary",
-        "ticker": "XLY",
-        "change_1d_pct": 2.409
-      },
-      {
-        "sector": "Financials",
-        "ticker": "XLF",
-        "change_1d_pct": 1.858
-      },
-      {
-        "sector": "Materials",
-        "ticker": "XLB",
-        "change_1d_pct": 1.763
-      },
-      {
-        "sector": "Consumer Staples",
-        "ticker": "XLP",
-        "change_1d_pct": 1.577
+        "change_1d_pct": 1.22
       },
       {
         "sector": "Industrials",
         "ticker": "XLI",
-        "change_1d_pct": 1.38
-      },
-      {
-        "sector": "Real Estate",
-        "ticker": "XLRE",
-        "change_1d_pct": 1.089
-      },
-      {
-        "sector": "Utilities",
-        "ticker": "XLU",
-        "change_1d_pct": 0.553
+        "change_1d_pct": 0.91
       },
       {
         "sector": "Communication Services",
         "ticker": "XLC",
-        "change_1d_pct": 0.36
+        "change_1d_pct": 0.773
+      }
+    ],
+    "bottom_3": [
+      {
+        "sector": "Materials",
+        "ticker": "XLB",
+        "change_1d_pct": -2.022
+      },
+      {
+        "sector": "Consumer Staples",
+        "ticker": "XLP",
+        "change_1d_pct": -1.877
+      },
+      {
+        "sector": "Consumer Discretionary",
+        "ticker": "XLY",
+        "change_1d_pct": -0.825
+      }
+    ],
+    "all": [
+      {
+        "sector": "Technology",
+        "ticker": "XLK",
+        "change_1d_pct": 1.22
+      },
+      {
+        "sector": "Industrials",
+        "ticker": "XLI",
+        "change_1d_pct": 0.91
+      },
+      {
+        "sector": "Communication Services",
+        "ticker": "XLC",
+        "change_1d_pct": 0.773
       },
       {
         "sector": "Health Care",
         "ticker": "XLV",
-        "change_1d_pct": -0.146
+        "change_1d_pct": -0.114
       },
       {
-        "sector": "Technology",
-        "ticker": "XLK",
-        "change_1d_pct": -2.947
+        "sector": "Real Estate",
+        "ticker": "XLRE",
+        "change_1d_pct": -0.309
+      },
+      {
+        "sector": "Utilities",
+        "ticker": "XLU",
+        "change_1d_pct": -0.424
       },
       {
         "sector": "Energy",
         "ticker": "XLE",
-        "change_1d_pct": -3.956
+        "change_1d_pct": -0.52
+      },
+      {
+        "sector": "Financials",
+        "ticker": "XLF",
+        "change_1d_pct": -0.643
+      },
+      {
+        "sector": "Consumer Discretionary",
+        "ticker": "XLY",
+        "change_1d_pct": -0.825
+      },
+      {
+        "sector": "Consumer Staples",
+        "ticker": "XLP",
+        "change_1d_pct": -1.877
+      },
+      {
+        "sector": "Materials",
+        "ticker": "XLB",
+        "change_1d_pct": -2.022
       }
     ]
   },
@@ -166,13 +177,13 @@
       "above_200ma": false
     },
     "VIX": {
-      "level": 21.15,
-      "change_1d_pct": 8.908
+      "level": 21.03,
+      "change_1d_pct": -0.567
     }
   },
   "coverage": {
     "configured_universe": 420,
     "daily_available": 420,
-    "intraday_available": null
+    "intraday_available": 420
   }
 }
