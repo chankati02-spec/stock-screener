@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-03T20:30:20Z",
-  "generated_at_hk": "2026-11-04T04:30:20+08:00",
+  "generated_at_utc": "2026-11-03T20:37:30Z",
+  "generated_at_hk": "2026-11-04T04:37:30+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-11-03",
-  "selected_count": 1,
-  "published_count": 1,
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "RSI",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday EP Rocket",
-      "price": 12.39,
-      "prev_close": 11.4,
-      "prev_high": 12.23,
-      "opening_range_high": 12.26,
-      "day_change": 8.68,
-      "raw_rvol": 3.12,
-      "adjusted_rvol": 3.12,
-      "turnover_m": 168.09,
-      "adr_20": 6.18,
-      "vwap": 12.26,
-      "ema9": 12.36,
-      "ema20": 12.33,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 100,
-      "data_time": "2026-11-03 15:30:00-05:00"
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
