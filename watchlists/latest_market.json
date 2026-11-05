@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-11-05T21:20:38Z",
-  "generated_at_hk": "2026-11-06T05:20:38+08:00",
+  "generated_at_utc": "2026-11-05T21:39:45Z",
+  "generated_at_hk": "2026-11-06T05:39:45+08:00",
   "market_date": "2026-11-05",
   "market_mode": "intraday",
   "mode": "MARKET_INTRADAY",
@@ -29,9 +29,9 @@
       "data_timestamp": "2026-11-05 15:55:00-05:00"
     },
     "QQQ": {
-      "last_price": 648.06,
+      "last_price": 647.8,
       "previous_close": 691.95,
-      "change_1d_pct": -6.343,
+      "change_1d_pct": -6.381,
       "return_5d_pct": -4.639,
       "return_1m_pct": -8.913,
       "return_63d_pct": -3.176,
@@ -49,25 +49,25 @@
       "data_timestamp": "2026-11-05 15:55:00-05:00"
     },
     "VIX": {
-      "last_price": 28.31,
+      "last_price": 28.15,
       "previous_close": 16.61,
-      "change_1d_pct": 70.439,
+      "change_1d_pct": 69.476,
       "return_5d_pct": -1.774,
       "return_1m_pct": 10.66,
       "return_63d_pct": 11.477,
       "price_date": "2026-11-04",
-      "data_timestamp": "2026-11-05 16:05:00-05:00"
+      "data_timestamp": "2026-11-05 16:10:00-05:00"
     }
   },
   "breadth": {
-    "valid_tickers": 402,
-    "positive_day_pct": 12.94,
-    "above_vwap_pct": 22.14,
-    "ema9_above_ema20_pct": 46.02,
+    "valid_tickers": 401,
+    "positive_day_pct": 12.97,
+    "above_vwap_pct": 21.95,
+    "ema9_above_ema20_pct": 45.89,
     "breakout_count": 32,
     "opening_range_breakout_count": 5,
     "near_breakout_count": 6,
-    "high_rvol_count": 128
+    "high_rvol_count": 119
   },
   "sector_performance": {
     "top_3": [
@@ -179,8 +179,8 @@
       "above_200ma": false
     },
     "VIX": {
-      "level": 28.31,
-      "change_1d_pct": 70.439
+      "level": 28.15,
+      "change_1d_pct": 69.476
     }
   },
   "coverage": {
