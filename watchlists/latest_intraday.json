@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-06T20:33:50Z",
-  "generated_at_hk": "2026-11-07T04:33:50+08:00",
+  "generated_at_utc": "2026-11-06T20:51:38Z",
+  "generated_at_hk": "2026-11-07T04:51:38+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
   "market_date": "2026-11-06",
@@ -11,25 +11,25 @@
   "other_skipped": 419,
   "stocks": [
     {
-      "ticker": "VST",
+      "ticker": "IONQ",
       "mode": "INTRADAY",
-      "setup_type": "Intraday EP Rocket",
-      "price": 125.43,
-      "prev_close": 112.89,
-      "prev_high": 118.91,
-      "opening_range_high": 122.62,
-      "day_change": 11.11,
-      "raw_rvol": 3.46,
-      "adjusted_rvol": 3.46,
-      "turnover_m": 3072.87,
-      "adr_20": 5.0,
-      "vwap": 123.41,
-      "ema9": 125.19,
-      "ema20": 124.77,
+      "setup_type": "Intraday Breakout",
+      "price": 32.19,
+      "prev_close": 26.43,
+      "prev_high": 29.12,
+      "opening_range_high": 29.76,
+      "day_change": 21.81,
+      "raw_rvol": 2.63,
+      "adjusted_rvol": 2.63,
+      "turnover_m": 1966.63,
+      "adr_20": 6.82,
+      "vwap": 30.13,
+      "ema9": 32.11,
+      "ema20": 31.91,
       "above_vwap": true,
       "ema9_above_ema20": true,
       "score": 100,
-      "data_time": "2026-11-06 15:30:00-05:00"
+      "data_time": "2026-11-06 15:50:00-05:00"
     }
   ]
 }
