@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-11-09T23:12:50Z",
-  "generated_at_hk": "2026-11-10T07:12:50+08:00",
+  "generated_at_utc": "2026-11-09T23:41:37Z",
+  "generated_at_hk": "2026-11-10T07:41:37+08:00",
   "market_date": "2026-11-09",
   "market_mode": "intraday",
   "mode": "MARKET_INTRADAY",
@@ -59,14 +59,14 @@
     }
   },
   "breadth": {
-    "valid_tickers": 401,
-    "positive_day_pct": 81.8,
-    "above_vwap_pct": 56.86,
-    "ema9_above_ema20_pct": 38.15,
-    "breakout_count": 236,
-    "opening_range_breakout_count": 214,
+    "valid_tickers": 400,
+    "positive_day_pct": 81.75,
+    "above_vwap_pct": 57.25,
+    "ema9_above_ema20_pct": 38.0,
+    "breakout_count": 235,
+    "opening_range_breakout_count": 213,
     "near_breakout_count": 30,
-    "high_rvol_count": 33
+    "high_rvol_count": 24
   },
   "sector_performance": {
     "top_3": [
