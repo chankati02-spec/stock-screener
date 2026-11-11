@@ -1,35 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-10T21:25:04Z",
-  "generated_at_hk": "2026-11-11T05:25:04+08:00",
+  "generated_at_utc": "2026-11-11T21:50:22Z",
+  "generated_at_hk": "2026-11-12T05:50:22+08:00",
   "mode": "INTRADAY",
   "mode_name": "盤中 EP / BO 模式",
-  "market_date": "2026-11-10",
-  "selected_count": 1,
-  "published_count": 1,
+  "market_date": "2026-11-11",
+  "selected_count": 0,
+  "published_count": 0,
   "stale_skipped": 0,
-  "other_skipped": 419,
-  "stocks": [
-    {
-      "ticker": "CHTR",
-      "mode": "INTRADAY",
-      "setup_type": "Intraday Breakout",
-      "price": 134.04,
-      "prev_close": 121.2,
-      "prev_high": 121.65,
-      "opening_range_high": 122.11,
-      "day_change": 10.59,
-      "raw_rvol": 2.07,
-      "adjusted_rvol": 2.07,
-      "turnover_m": 802.76,
-      "adr_20": 4.5,
-      "vwap": 130.28,
-      "ema9": 133.97,
-      "ema20": 133.32,
-      "above_vwap": true,
-      "ema9_above_ema20": true,
-      "score": 97.71,
-      "data_time": "2026-11-10 15:55:00-05:00"
-    }
-  ]
+  "other_skipped": 420,
+  "stocks": []
 }
