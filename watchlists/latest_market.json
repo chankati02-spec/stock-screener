@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "generated_at_utc": "2026-11-11T21:44:00Z",
-  "generated_at_hk": "2026-11-12T05:44:00+08:00",
+  "generated_at_utc": "2026-11-11T22:21:38Z",
+  "generated_at_hk": "2026-11-12T06:21:38+08:00",
   "market_date": "2026-11-11",
   "market_mode": "intraday",
   "mode": "MARKET_INTRADAY",
@@ -62,12 +62,12 @@
   "breadth": {
     "valid_tickers": 401,
     "positive_day_pct": 67.58,
-    "above_vwap_pct": 66.08,
+    "above_vwap_pct": 65.59,
     "ema9_above_ema20_pct": 54.61,
     "breakout_count": 167,
     "opening_range_breakout_count": 170,
-    "near_breakout_count": 52,
-    "high_rvol_count": 16
+    "near_breakout_count": 54,
+    "high_rvol_count": 15
   },
   "sector_performance": {
     "top_3": [
@@ -128,7 +128,7 @@
       {
         "sector": "Financials",
         "ticker": "XLF",
-        "change_1d_pct": 0.549
+        "change_1d_pct": 0.558
       },
       {
         "sector": "Consumer Staples",
